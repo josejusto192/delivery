@@ -60,9 +60,9 @@ export default function MenuBrowser({
   return (
     <div className="pb-6">
       {settings && (
-        <section className="-mx-4 mb-5">
+        <section className="-mx-4 mb-5 md:mx-0 md:rounded-2xl md:overflow-hidden">
           <BannerSlider urls={settings.banner_urls?.length ? settings.banner_urls : settings.banner_url ? [settings.banner_url] : []} />
-          <p className="mx-4 mt-3 text-xs text-neutral-500">
+          <p className="mx-4 mt-3 text-xs text-neutral-500 md:mx-0">
             🛵 {feeLabel} · hoje, {settings.delivery_time_min}–{settings.delivery_time_max} min
             {Number(settings.min_order) > 0 && <> · mínimo {brl(Number(settings.min_order))}</>}
           </p>
@@ -71,17 +71,17 @@ export default function MenuBrowser({
 
       <div className="space-y-6">
         <input
-          className="input !rounded-full"
+          className="input !rounded-full md:max-w-md"
           placeholder="busque por item ou categoria"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
 
-        <nav className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+        <nav className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 md:flex-wrap md:overflow-visible md:mx-0 md:px-0">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium border ${
-              !activeCategory ? 'bg-brand text-white border-brand' : 'bg-white border-neutral-300'
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium border transition-colors ${
+              !activeCategory ? 'bg-brand text-white border-brand' : 'bg-white border-neutral-300 hover:border-brand'
             }`}
           >
             Tudo
@@ -90,10 +90,10 @@ export default function MenuBrowser({
             <button
               key={c.id}
               onClick={() => setActiveCategory(c.id)}
-              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium border ${
+              className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium border transition-colors ${
                 activeCategory === c.id
                   ? 'bg-brand text-white border-brand'
-                  : 'bg-white border-neutral-300'
+                  : 'bg-white border-neutral-300 hover:border-brand'
               }`}
             >
               {c.name}
@@ -104,7 +104,7 @@ export default function MenuBrowser({
         {!activeCategory && !search && featured.length > 0 && (
           <section>
             <h2 className="text-lg font-bold mb-3">⭐ Destaques</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {featured.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -117,7 +117,7 @@ export default function MenuBrowser({
             <h2 className="text-lg font-bold mb-3">
               {categories.find((c) => c.id === catId)?.name}
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {items.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -182,7 +182,7 @@ function BannerSlider({ urls }: { urls: string[] }) {
   if (!urls.length) return null;
 
   return (
-    <div className="relative w-full h-36 sm:h-48 overflow-hidden">
+    <div className="relative w-full h-36 sm:h-48 md:h-64 lg:h-80 overflow-hidden">
       {urls.map((url, i) => (
         // eslint-disable-next-line @next/next/no-img-element
         <img

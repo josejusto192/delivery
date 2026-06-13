@@ -24,7 +24,7 @@ export default function Header({
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-neutral-200">
-      <div className="mx-auto max-w-5xl px-4 h-16 flex items-center justify-between gap-4">
+      <div className="mx-auto max-w-6xl px-4 h-16 flex items-center justify-between gap-4">
         <Link href="/" className="flex items-center gap-3 min-w-0">
           {settings?.logo_url ? (
             // eslint-disable-next-line @next/next/no-img-element
