@@ -49,6 +49,71 @@ function minutesAgo(iso: string): string {
   return `${h}h${min % 60 > 0 ? ` ${min % 60}m` : ''}`;
 }
 
+function printOrder(order: Order) {
+  const addr = order.address;
+  const win = window.open('', '_blank', 'width=380,height=600');
+  if (!win) return;
+  const itemsHtml = (order.order_items ?? [])
+    .map(
+      (item) => `
+        <div class="item">
+          <div class="item-line"><span>${item.quantity}x ${escapeHtml(item.product_name)}</span><span>${brl(Number(item.total))}</span></div>
+          ${item.addons?.length ? `<div class="addons">+ ${item.addons.map((a) => escapeHtml(a.name)).join(', ')}</div>` : ''}
+          ${item.notes ? `<div class="addons">Obs: ${escapeHtml(item.notes)}</div>` : ''}
+        </div>`
+    )
+    .join('');
+
+  win.document.write(`
+    <html>
+      <head>
+        <title>Pedido #${order.code}</title>
+        <style>
+          * { box-sizing: border-box; }
+          body { font-family: monospace; font-size: 13px; width: 280px; margin: 0 auto; padding: 12px; color: #000; }
+          h1 { font-size: 18px; text-align: center; margin: 0 0 4px; }
+          .center { text-align: center; }
+          hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+          .item-line { display: flex; justify-content: space-between; gap: 8px; font-weight: bold; }
+          .addons { font-size: 12px; padding-left: 10px; }
+          .total-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 15px; }
+          .row { display: flex; justify-content: space-between; }
+        </style>
+      </head>
+      <body>
+        <h1>Pedido #${order.code}</h1>
+        <p class="center">${formatDateTime(order.created_at)}</p>
+        <hr />
+        <p><strong>${escapeHtml(order.customer_name)}</strong><br/>${escapeHtml(order.customer_whatsapp)}</p>
+        <p>${order.fulfillment === 'delivery' ? 'ENTREGA' : 'RETIRADA'} · ${PAYMENT_LABELS[order.payment_method]}${
+          order.payment_method === 'cash' && order.change_for ? ` · troco p/ ${brl(Number(order.change_for))}` : ''
+        }</p>
+        ${
+          addr
+            ? `<p>${escapeHtml(addr.street)}, ${escapeHtml(addr.number)}${addr.complement ? ` - ${escapeHtml(addr.complement)}` : ''}<br/>${escapeHtml(addr.neighborhood)}${addr.area ? ` (${escapeHtml(addr.area)})` : ''}${addr.reference ? `<br/>Ref: ${escapeHtml(addr.reference)}` : ''}</p>`
+            : ''
+        }
+        <hr />
+        ${itemsHtml}
+        <hr />
+        <div class="row"><span>Subtotal</span><span>${brl(Number(order.subtotal))}</span></div>
+        <div class="row"><span>Entrega</span><span>${Number(order.delivery_fee) === 0 ? 'Grátis' : brl(Number(order.delivery_fee))}</span></div>
+        ${Number(order.discount) > 0 ? `<div class="row"><span>Desconto${order.coupon_code ? ` (${escapeHtml(order.coupon_code)})` : ''}</span><span>- ${brl(Number(order.discount))}</span></div>` : ''}
+        <hr />
+        <div class="total-line"><span>TOTAL</span><span>${brl(Number(order.total))}</span></div>
+        ${order.notes ? `<hr /><p>Obs.: ${escapeHtml(order.notes)}</p>` : ''}
+      </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
 export default function OrdersBoard() {
   const supabase = useMemo(() => createClient(), []);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -58,14 +123,39 @@ export default function OrdersBoard() {
   const [detail, setDetail] = useState<Order | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<OrderStatus | null>(null);
+  const [soundOn, setSoundOn] = useState(true);
+  const [notifyOn, setNotifyOn] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem('orders-view');
       if (saved === 'list' || saved === 'kanban') setView(saved);
+      const savedSound = localStorage.getItem('orders-sound');
+      if (savedSound === 'off') setSoundOn(false);
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') setNotifyOn(true);
     } catch {}
   }, []);
+
+  const toggleSound = () => {
+    setSoundOn((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('orders-sound', next ? 'on' : 'off');
+      } catch {}
+      return next;
+    });
+  };
+
+  const toggleNotify = async () => {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'granted') {
+      setNotifyOn((v) => !v);
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    setNotifyOn(perm === 'granted');
+  };
 
   const switchView = (v: 'kanban' | 'list') => {
     setView(v);
@@ -88,7 +178,18 @@ export default function OrdersBoard() {
     const channel = supabase
       .channel('orders-board')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.eventType === 'INSERT') beep(audioRef);
+        if (payload.eventType === 'INSERT') {
+          if (soundOn) beep(audioRef);
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            const o = payload.new as Order;
+            try {
+              new Notification(`Novo pedido #${o.code}`, {
+                body: `${o.customer_name} · ${brl(Number(o.total))}`,
+                tag: `order-${o.id}`,
+              });
+            } catch {}
+          }
+        }
         load();
       })
       .subscribe();
@@ -97,7 +198,7 @@ export default function OrdersBoard() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [supabase, load]);
+  }, [supabase, load, soundOn]);
 
   const updateStatus = async (id: string, status: OrderStatus) => {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
@@ -144,6 +245,24 @@ export default function OrdersBoard() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold mr-auto">Pedidos</h1>
+        <button
+          onClick={toggleSound}
+          title={soundOn ? 'Som ativado' : 'Som desativado'}
+          className={`h-9 w-9 flex items-center justify-center rounded-lg border text-sm ${
+            soundOn ? 'bg-white border-neutral-300' : 'bg-neutral-100 border-neutral-300 text-neutral-400'
+          }`}
+        >
+          {soundOn ? '🔔' : '🔕'}
+        </button>
+        <button
+          onClick={toggleNotify}
+          title={notifyOn ? 'Notificações ativadas' : 'Ativar notificações'}
+          className={`h-9 w-9 flex items-center justify-center rounded-lg border text-sm ${
+            notifyOn ? 'bg-white border-neutral-300' : 'bg-neutral-100 border-neutral-300 text-neutral-400'
+          }`}
+        >
+          {notifyOn ? '🖥️' : '🚫'}
+        </button>
         <div className="flex rounded-lg border border-neutral-300 overflow-hidden bg-white">
           <button
             onClick={() => switchView('kanban')}
@@ -408,6 +527,12 @@ function OrderDetailModal({
           </div>
 
           <div className="flex gap-2 pt-1">
+            <button
+              className="border border-neutral-300 rounded-lg px-4 py-2.5 text-sm font-semibold bg-white"
+              onClick={() => printOrder(order)}
+            >
+              🖨️ Imprimir
+            </button>
             {next && (
               <button className="btn-brand !py-2.5 text-sm flex-1" onClick={() => onStatus(order.id, next)}>
                 Avançar para “{ORDER_STATUS_LABELS[next]}”
@@ -432,14 +557,18 @@ function beep(ref: React.MutableRefObject<AudioContext | null>) {
   try {
     if (!ref.current) ref.current = new AudioContext();
     const ctx = ref.current;
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.6);
+    const tones = [880, 1100, 880];
+    tones.forEach((freq, i) => {
+      const start = ctx.currentTime + i * 0.35;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.35, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
   } catch {}
 }
