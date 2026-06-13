@@ -189,4 +189,25 @@ function BannerSlider({ urls }: { urls: string[] }) {
           key={url}
           src={url}
           alt=""
-          className={`absolute inset-0 w-full h-full obje
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+            i === index ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+      ))}
+      {urls.length > 1 && (
+        <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
+          {urls.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIndex(i)}
+              aria-label={`Banner ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all ${
+                i === index ? 'w-5 bg-white' : 'w-1.5 bg-white/50'
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
