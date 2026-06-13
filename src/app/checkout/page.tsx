@@ -34,24 +34,68 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const loadAccount = async (id: string) => {
+    setUserId(id);
+    const { data: profile } = await supabase
+      .from('profiles').select('name, whatsapp').eq('id', id).single();
+    if (profile) {
+      if (profile.name) setName(profile.name);
+      if (profile.whatsapp) setWhatsapp(maskPhone(profile.whatsapp));
+    }
+    const { data: addrs } = await supabase.from('addresses').select('*').eq('user_id', id);
+    setSavedAddresses(addrs ?? []);
+  };
+
   useEffect(() => {
     (async () => {
       const { data: s } = await supabase.from('store_settings').select('*').single();
       setSettings(s);
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-        const { data: profile } = await supabase
-          .from('profiles').select('name, whatsapp').eq('id', user.id).single();
-        if (profile) {
-          setName(profile.name ?? '');
-          setWhatsapp(maskPhone(profile.whatsapp ?? ''));
-        }
-        const { data: addrs } = await supabase.from('addresses').select('*').eq('user_id', user.id);
-        setSavedAddresses(addrs ?? []);
-      }
+      if (user) await loadAccount(user.id);
     })();
   }, [supabase]);
+
+  const submitAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthMessage('');
+    setAuthLoading(true);
+    try {
+      if (authMode === 'login') {
+        const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword });
+        if (error) throw new Error('E-mail ou senha incorretos.');
+        if (data.user) await loadAccount(data.user.id);
+        setAuthMode(null);
+      } else {
+        if (!name.trim()) throw new Error('Informe seu nome.');
+        if (whatsapp && !isValidPhone(whatsapp)) throw new Error('WhatsApp inválido. Use o formato (11) 99999-9999.');
+        const { data, error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+          options: { data: { name: name.trim(), whatsapp: whatsapp.trim() } },
+        });
+        if (error) throw new Error(error.message);
+        if (data.user && data.session) {
+          await loadAccount(data.user.id);
+          setAuthMode(null);
+        } else {
+          setAuthMessage('Conta criada! Verifique seu e-mail para confirmar e depois entre.');
+          setAuthMode('login');
+        }
+      }
+    } catch (e) {
+      setAuthError(e instanceof Error ? e.message : 'Erro inesperado.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   const deliveryFee = useMemo(() => {
     if (fulfillment === 'pickup') return 0;
@@ -166,6 +210,69 @@ export default function CheckoutPage() {
   return (
     <div className="py-6 max-w-2xl mx-auto space-y-5">
       <h1 className="text-2xl font-bold">Finalizar pedido</h1>
+
+      {!userId && (
+        <section className="card p-4 space-y-3">
+          {authMode === null ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-neutral-500">Já tem conta? Entre para acompanhar seus pedidos.</p>
+              <div className="flex gap-2 shrink-0">
+                <button type="button" className="text-sm font-semibold text-brand" onClick={() => setAuthMode('login')}>
+                  Entrar
+                </button>
+                <button type="button" className="text-sm font-semibold text-brand" onClick={() => setAuthMode('signup')}>
+                  Cadastrar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={submitAuth} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold">{authMode === 'login' ? 'Entrar' : 'Criar conta'}</h2>
+                <button type="button" className="text-xs text-neutral-500" onClick={() => setAuthMode(null)}>
+                  continuar sem login
+                </button>
+              </div>
+              {authMode === 'signup' && (
+                <p className="text-xs text-neutral-500">
+                  Usaremos o nome e WhatsApp informados acima para sua conta.
+                </p>
+              )}
+              <input
+                className="input"
+                type="email"
+                placeholder="E-mail"
+                autoComplete="email"
+                required
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+              />
+              <input
+                className="input"
+                type="password"
+                placeholder="Senha"
+                autoComplete={authMode === 'signup' ? 'new-password' : 'current-password'}
+                required
+                minLength={6}
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+              />
+              {authError && <p className="text-sm text-red-500">{authError}</p>}
+              {authMessage && <p className="text-sm text-green-600">{authMessage}</p>}
+              <button type="submit" className="btn-brand w-full" disabled={authLoading}>
+                {authLoading ? 'Aguarde...' : authMode === 'login' ? 'Entrar' : 'Criar conta'}
+              </button>
+              <button
+                type="button"
+                className="text-sm text-brand font-semibold block mx-auto"
+                onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}
+              >
+                {authMode === 'login' ? 'Não tem conta? Cadastre-se' : 'Já tenho conta — entrar'}
+              </button>
+            </form>
+          )}
+        </section>
+      )}
 
       <section className="card p-4 space-y-3">
         <h2 className="font-semibold">Seus dados</h2>
