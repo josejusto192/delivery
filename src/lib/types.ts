@@ -147,4 +147,5 @@ export type Order = {
 export const PAYMENT_LABELS = {
   pix: 'PIX',
   card: 'Cartão',
-  cash:
+  cash: 'Dinheiro',
+} as const;
