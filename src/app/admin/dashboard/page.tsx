@@ -15,60 +15,121 @@ const ALL_STATUSES: OrderStatus[] = [
   'canceled',
 ];
 
+type Period = '24h' | 'today' | 'yesterday' | '7d' | '30d' | 'week' | 'month' | 'custom';
+
+const PERIOD_OPTIONS: { value: Period; label: string }[] = [
+  { value: '24h', label: 'Últimas 24h' },
+  { value: 'today', label: 'Hoje' },
+  { value: 'yesterday', label: 'Ontem' },
+  { value: 'week', label: 'Esta semana' },
+  { value: '7d', label: 'Últimos 7 dias' },
+  { value: 'month', label: 'Este mês' },
+  { value: '30d', label: 'Últimos 30 dias' },
+  { value: 'custom', label: 'Personalizado' },
+];
+
 function startOfDay(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
 }
 
+function toInputDate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function rangeFor(period: Period, customFrom: string, customTo: string): { from: Date; to: Date } {
+  const now = new Date();
+  switch (period) {
+    case '24h':
+      return { from: new Date(now.getTime() - 24 * 3600 * 1000), to: now };
+    case 'today':
+      return { from: startOfDay(now), to: now };
+    case 'yesterday': {
+      const y = startOfDay(now);
+      y.setDate(y.getDate() - 1);
+      const end = startOfDay(now);
+      return { from: y, to: end };
+    }
+    case '7d':
+      return { from: new Date(now.getTime() - 7 * 86400 * 1000), to: now };
+    case '30d':
+      return { from: new Date(now.getTime() - 30 * 86400 * 1000), to: now };
+    case 'week': {
+      const day = startOfDay(now);
+      const weekday = (day.getDay() + 6) % 7; // segunda = 0
+      day.setDate(day.getDate() - weekday);
+      return { from: day, to: now };
+    }
+    case 'month': {
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { from: first, to: now };
+    }
+    case 'custom': {
+      const from = customFrom ? startOfDay(new Date(customFrom)) : startOfDay(now);
+      const to = customTo ? new Date(new Date(customTo).getTime() + 86400 * 1000) : now;
+      return { from, to };
+    }
+  }
+}
+
 export default function DashboardPage() {
   const supabase = useMemo(() => createClient(), []);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<Period>('today');
+  const [customFrom, setCustomFrom] = useState(toInputDate(new Date()));
+  const [customTo, setCustomTo] = useState(toInputDate(new Date()));
 
   useEffect(() => {
     (async () => {
       const since = new Date();
-      since.setDate(since.getDate() - 7);
+      since.setDate(since.getDate() - 90);
       const { data } = await supabase
         .from('orders')
         .select('*')
         .gte('created_at', since.toISOString())
         .order('created_at', { ascending: false })
-        .limit(1000);
+        .limit(5000);
       setOrders((data ?? []) as Order[]);
       setLoading(false);
     })();
   }, [supabase]);
 
-  const today = startOfDay(new Date());
+  const { from, to } = useMemo(() => rangeFor(period, customFrom, customTo), [period, customFrom, customTo]);
 
-  const todayOrders = useMemo(
-    () => orders.filter((o) => new Date(o.created_at) >= today && o.status !== 'canceled'),
-    [orders, today]
+  const periodOrders = useMemo(
+    () =>
+      orders.filter((o) => {
+        const d = new Date(o.created_at);
+        return d >= from && d < to;
+      }),
+    [orders, from, to]
   );
 
-  const revenueToday = todayOrders.reduce((s, o) => s + Number(o.total), 0);
-  const ticketMedio = todayOrders.length ? revenueToday / todayOrders.length : 0;
+  const validOrders = periodOrders.filter((o) => o.status !== 'canceled');
+  const revenue = validOrders.reduce((s, o) => s + Number(o.total), 0);
+  const ticketMedio = validOrders.length ? revenue / validOrders.length : 0;
 
   const statusCounts = useMemo(() => {
     const map = new Map<OrderStatus, number>();
-    for (const o of orders.filter((o) => new Date(o.created_at) >= today)) {
+    for (const o of periodOrders) {
       map.set(o.status, (map.get(o.status) ?? 0) + 1);
     }
     return map;
-  }, [orders, today]);
+  }, [periodOrders]);
 
-  const last7Days = useMemo(() => {
+  const dailySeries = useMemo(() => {
     const days: { label: string; revenue: number; count: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const day = startOfDay(new Date());
+    const totalDays = Math.max(1, Math.min(31, Math.ceil((to.getTime() - from.getTime()) / 86400000)));
+    for (let i = totalDays - 1; i >= 0; i--) {
+      const day = startOfDay(to);
       day.setDate(day.getDate() - i);
       const next = new Date(day);
       next.setDate(next.getDate() + 1);
       const dayOrders = orders.filter((o) => {
         const d = new Date(o.created_at);
-        return d >= day && d < next && o.status !== 'canceled';
+        return d >= day && d < next && d >= from && d < to && o.status !== 'canceled';
       });
       days.push({
         label: day.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' }),
@@ -77,9 +138,9 @@ export default function DashboardPage() {
       });
     }
     return days;
-  }, [orders]);
+  }, [orders, from, to]);
 
-  const maxRevenue = Math.max(1, ...last7Days.map((d) => d.revenue));
+  const maxRevenue = Math.max(1, ...dailySeries.map((d) => d.revenue));
 
   if (loading) {
     return <p className="text-neutral-500 py-8 text-center">Carregando...</p>;
@@ -87,29 +148,70 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold">Dashboard</h1>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-xl font-bold mr-auto">Dashboard</h1>
+        <div className="flex flex-wrap gap-1.5">
+          {PERIOD_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setPeriod(opt.value)}
+              className={`whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-semibold border ${
+                period === opt.value ? 'bg-brand text-white border-brand' : 'bg-white border-neutral-300 text-neutral-600'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {period === 'custom' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-sm text-neutral-500">
+            De{' '}
+            <input
+              type="date"
+              className="input !w-auto"
+              value={customFrom}
+              max={customTo}
+              onChange={(e) => setCustomFrom(e.target.value)}
+            />
+          </label>
+          <label className="text-sm text-neutral-500">
+            Até{' '}
+            <input
+              type="date"
+              className="input !w-auto"
+              value={customTo}
+              min={customFrom}
+              max={toInputDate(new Date())}
+              onChange={(e) => setCustomTo(e.target.value)}
+            />
+          </label>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="card p-4">
-          <p className="text-xs text-neutral-500">Pedidos hoje</p>
-          <p className="text-2xl font-bold mt-1">{todayOrders.length}</p>
+          <p className="text-xs text-neutral-500">Pedidos</p>
+          <p className="text-2xl font-bold mt-1">{validOrders.length}</p>
         </div>
         <div className="card p-4">
-          <p className="text-xs text-neutral-500">Faturamento hoje</p>
-          <p className="text-2xl font-bold mt-1">{brl(revenueToday)}</p>
+          <p className="text-xs text-neutral-500">Faturamento</p>
+          <p className="text-2xl font-bold mt-1">{brl(revenue)}</p>
         </div>
         <div className="card p-4">
           <p className="text-xs text-neutral-500">Ticket médio</p>
           <p className="text-2xl font-bold mt-1">{brl(ticketMedio)}</p>
         </div>
         <div className="card p-4">
-          <p className="text-xs text-neutral-500">Cancelados hoje</p>
+          <p className="text-xs text-neutral-500">Cancelados</p>
           <p className="text-2xl font-bold mt-1">{statusCounts.get('canceled') ?? 0}</p>
         </div>
       </div>
 
       <div className="card p-4">
-        <h2 className="font-bold mb-3">Pedidos por status (hoje)</h2>
+        <h2 className="font-bold mb-3">Pedidos por status</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           {ALL_STATUSES.map((s) => (
             <div key={s} className="rounded-lg bg-neutral-100 p-3 text-center">
@@ -121,10 +223,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="card p-4">
-        <h2 className="font-bold mb-3">Faturamento — últimos 7 dias</h2>
-        <div className="flex items-end gap-2 h-40">
-          {last7Days.map((d) => (
-            <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
+        <h2 className="font-bold mb-3">Faturamento por dia</h2>
+        <div className="flex items-end gap-2 h-40 overflow-x-auto">
+          {dailySeries.map((d, i) => (
+            <div key={i} className="flex-1 min-w-[2.5rem] flex flex-col items-center gap-1">
               <span className="text-xs font-semibold">{d.revenue > 0 ? brl(d.revenue) : ''}</span>
               <div
                 className="w-full bg-brand rounded-t-md"
