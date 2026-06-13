@@ -45,6 +45,7 @@ export default function OrderTrackingPage() {
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -60,6 +61,7 @@ export default function OrderTrackingPage() {
       .select('*')
       .single()
       .then(({ data }) => active && setSettings(data));
+    supabase.auth.getUser().then(({ data }) => active && setLoggedIn(!!data.user));
     const interval = setInterval(load, 10000);
     return () => {
       active = false;
@@ -86,6 +88,10 @@ export default function OrderTrackingPage() {
 
   return (
     <div className="py-6 max-w-2xl mx-auto space-y-4">
+      <div className="card p-3 text-center bg-green-50 border-green-200 text-green-700 text-sm font-medium">
+        ✓ Pedido recebido com sucesso!
+      </div>
+
       <div className="text-center space-y-1">
         <h1 className="text-2xl font-bold">Pedido #{order.code}</h1>
         <p className="text-neutral-500 text-sm">Feito em {formatDateTime(order.created_at)}</p>
@@ -193,6 +199,22 @@ export default function OrderTrackingPage() {
         </p>
         {order.notes && <p className="text-neutral-500">Obs.: {order.notes}</p>}
       </div>
+
+      {loggedIn === false && (
+        <div className="card p-5 text-center space-y-2">
+          <h2 className="font-semibold text-sm">Salve este pedido na sua conta</h2>
+          <p className="text-sm text-neutral-500">
+            Você fez este pedido sem login. Guarde o link desta página para acompanhá-lo, ou crie uma conta para ver
+            todos os seus pedidos em um só lugar.
+          </p>
+          <Link
+            href={`/conta/entrar?next=/pedido/${order.id}`}
+            className="inline-block btn-brand !py-2 !px-6 text-sm"
+          >
+            Criar conta ou entrar
+          </Link>
+        </div>
+      )}
 
       <div className="card p-5 text-center space-y-2">
         <h2 className="font-semibold text-sm">Precisa de ajuda com seu pedido?</h2>
