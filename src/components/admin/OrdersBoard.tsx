@@ -125,6 +125,7 @@ export default function OrdersBoard() {
   const [dragOver, setDragOver] = useState<OrderStatus | null>(null);
   const [soundOn, setSoundOn] = useState(true);
   const [notifyOn, setNotifyOn] = useState(false);
+  const [autoPrint, setAutoPrint] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
@@ -133,6 +134,8 @@ export default function OrdersBoard() {
       if (saved === 'list' || saved === 'kanban') setView(saved);
       const savedSound = localStorage.getItem('orders-sound');
       if (savedSound === 'off') setSoundOn(false);
+      const savedAutoPrint = localStorage.getItem('orders-autoprint');
+      if (savedAutoPrint === 'on') setAutoPrint(true);
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') setNotifyOn(true);
     } catch {}
   }, []);
@@ -142,6 +145,16 @@ export default function OrdersBoard() {
       const next = !prev;
       try {
         localStorage.setItem('orders-sound', next ? 'on' : 'off');
+      } catch {}
+      return next;
+    });
+  };
+
+  const toggleAutoPrint = () => {
+    setAutoPrint((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('orders-autoprint', next ? 'on' : 'off');
       } catch {}
       return next;
     });
@@ -180,14 +193,24 @@ export default function OrdersBoard() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           if (soundOn) beep(audioRef);
+          const o = payload.new as Order;
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            const o = payload.new as Order;
             try {
               new Notification(`Novo pedido #${o.code}`, {
                 body: `${o.customer_name} · ${brl(Number(o.total))}`,
                 tag: `order-${o.id}`,
               });
             } catch {}
+          }
+          if (autoPrint) {
+            supabase
+              .from('orders')
+              .select('*, order_items(*)')
+              .eq('id', o.id)
+              .single()
+              .then(({ data }) => {
+                if (data) printOrder(data as Order);
+              });
           }
         }
         load();
@@ -198,7 +221,7 @@ export default function OrdersBoard() {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [supabase, load, soundOn]);
+  }, [supabase, load, soundOn, autoPrint]);
 
   const updateStatus = async (id: string, status: OrderStatus) => {
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
@@ -253,6 +276,15 @@ export default function OrdersBoard() {
           }`}
         >
           {soundOn ? '🔔' : '🔕'}
+        </button>
+        <button
+          onClick={toggleAutoPrint}
+          title={autoPrint ? 'Impressão automática ativada' : 'Ativar impressão automática'}
+          className={`h-9 w-9 flex items-center justify-center rounded-lg border text-sm ${
+            autoPrint ? 'bg-white border-neutral-300' : 'bg-neutral-100 border-neutral-300 text-neutral-400'
+          }`}
+        >
+          🖨️
         </button>
         <button
           onClick={toggleNotify}
