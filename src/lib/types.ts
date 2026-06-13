@@ -1,0 +1,150 @@
+export type StoreSettings = {
+  id: number;
+  name: string;
+  logo_url: string | null;
+  banner_url: string | null;
+  banner_urls: string[];
+  delivery_time_min: number;
+  delivery_time_max: number;
+  phone: string | null;
+  whatsapp: string | null;
+  address: string | null;
+  brand_color: string;
+  is_open: boolean;
+  opening_hours: Record<string, [string, string][]>;
+  delivery_fee: number;
+  min_order: number;
+  delivery_areas: { name: string; fee: number }[];
+};
+
+export type Category = {
+  id: string;
+  name: string;
+  sort_order: number;
+  active: boolean;
+};
+
+export type Addon = {
+  id: string;
+  group_id: string;
+  name: string;
+  price: number;
+  active: boolean;
+  sort_order: number;
+};
+
+export type AddonGroup = {
+  id: string;
+  product_id: string;
+  name: string;
+  min_select: number;
+  max_select: number;
+  sort_order: number;
+  addons: Addon[];
+};
+
+export type Product = {
+  id: string;
+  category_id: string | null;
+  name: string;
+  description: string;
+  price: number;
+  promo_price: number | null;
+  image_url: string | null;
+  featured: boolean;
+  active: boolean;
+  sort_order: number;
+  addon_groups?: AddonGroup[];
+};
+
+export type Coupon = {
+  id: string;
+  code: string;
+  type: 'percent' | 'fixed' | 'free_delivery';
+  value: number;
+  min_order: number;
+  max_uses: number | null;
+  used_count: number;
+  active: boolean;
+  expires_at: string | null;
+};
+
+export type Address = {
+  id: string;
+  user_id: string;
+  label: string;
+  street: string;
+  number: string;
+  complement: string | null;
+  neighborhood: string;
+  city: string;
+  reference: string | null;
+};
+
+export type OrderStatus =
+  | 'new'
+  | 'confirmed'
+  | 'preparing'
+  | 'ready'
+  | 'out_for_delivery'
+  | 'delivered'
+  | 'canceled';
+
+export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  new: 'Novo pedido',
+  confirmed: 'Confirmado',
+  preparing: 'Em produção',
+  ready: 'Pronto',
+  out_for_delivery: 'Saiu para entrega',
+  delivered: 'Entregue',
+  canceled: 'Cancelado',
+};
+
+export const ORDER_STATUS_FLOW: OrderStatus[] = [
+  'new',
+  'confirmed',
+  'preparing',
+  'ready',
+  'out_for_delivery',
+  'delivered',
+];
+
+export type OrderItem = {
+  id: string;
+  order_id: string;
+  product_id: string | null;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  addons: { name: string; price: number }[];
+  notes: string | null;
+  total: number;
+};
+
+export type Order = {
+  id: string;
+  code: number;
+  user_id: string | null;
+  customer_name: string;
+  customer_whatsapp: string;
+  fulfillment: 'delivery' | 'pickup';
+  address: Record<string, string> | null;
+  payment_method: 'pix' | 'card' | 'cash';
+  change_for: number | null;
+  status: OrderStatus;
+  channel: 'web' | 'counter' | 'phone' | 'whatsapp';
+  subtotal: number;
+  delivery_fee: number;
+  discount: number;
+  total: number;
+  coupon_code: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  order_items?: OrderItem[];
+};
+
+export const PAYMENT_LABELS = {
+  pix: 'PIX',
+  card: 'Cartão',
+  cash:
