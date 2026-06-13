@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Header from './Header';
+import BottomNav from './BottomNav';
 import type { StoreSettings } from '@/lib/types';
 
 export default function SiteShell({
@@ -21,7 +22,8 @@ export default function SiteShell({
   return (
     <>
       <Header settings={settings} loggedIn={loggedIn} />
-      <main className="mx-auto max-w-6xl px-4 pb-24">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 pb-24 md:pb-12">{children}</main>
+      <BottomNav loggedIn={loggedIn} />
     </>
   );
 }
