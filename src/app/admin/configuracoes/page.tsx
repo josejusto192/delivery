@@ -147,7 +147,8 @@ export default function SettingsAdminPage() {
   };
 
   return (
-    <div className="max-w-xl space-y-4">
+    <div className="max-w-5xl space-y-4">
+      <div className="grid lg:grid-cols-2 gap-4 items-start">
       <div className="card p-4 space-y-3">
         <h3 className="font-semibold">Loja</h3>
         <label className="flex items-center justify-between text-sm font-medium">
@@ -362,8 +363,9 @@ export default function SettingsAdminPage() {
         <input className="input" placeholder="Título da página /indicacao" value={s.referral_title} onChange={(e) => set({ referral_title: e.target.value })} />
         <textarea className="input" rows={2} placeholder="Descrição" value={s.referral_description} onChange={(e) => set({ referral_description: e.target.value })} />
       </div>
+      </div>
 
-      <button className="btn-brand w-full" onClick={save} disabled={saving}>
+      <button className="btn-brand w-full lg:w-auto lg:px-12" onClick={save} disabled={saving}>
         {saving ? 'Salvando...' : saved ? 'Salvo ✓' : 'Salvar configurações'}
       </button>
     </div>
