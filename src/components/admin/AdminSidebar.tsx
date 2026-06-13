@@ -34,7 +34,7 @@ const ITEMS: NavItem[] = [
     ],
   },
   { label: 'Clientes', href: '/admin/clientes', icon: <I d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 014-4h2a4 4 0 014 4v2zm0-10a4 4 0 100-8 4 4 0 000 8zm8 1a3 3 0 100-6" /> },
-  { label: 'Marketing', soon: true, icon: <I d="M11 5L4 9v6l7 4V5zm0 0l9-3v20l-9-3M4 15v4" /> },
+  { label: 'Cupons', href: '/admin/cupons', icon: <I d="M11 5L4 9v6l7 4V5zm0 0l9-3v20l-9-3M4 15v4" /> },
   { label: 'WhatsApp', soon: true, icon: <I d="M21 12a9 9 0 01-13.4 7.8L3 21l1.3-4.5A9 9 0 1121 12zM8.5 9.5c.5 3 3 5.5 6 6l1.5-1.5 2 1-.5 2c-5 .5-9.5-4-9-9l2-.5 1 2-1.5 1.5" /> },
   { label: 'Financeiro', soon: true, icon: <I d="M12 8c-2.2 0-4 .9-4 2s1.8 2 4 2 4 .9 4 2-1.8 2-4 2m0-8c1.7 0 3.2.5 3.8 1.3M12 8V6m0 10c-1.7 0-3.2-.5-3.8-1.3M12 16v2m9-6a9 9 0 11-18 0 9 9 0 0118 0z" /> },
   { label: 'Relatórios', soon: true, icon: <I d="M8 17v-5m4 5V7m4 10v-3M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" /> },

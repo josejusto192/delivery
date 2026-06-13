@@ -21,6 +21,7 @@ export default function SettingsAdminPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [bannerUrls, setBannerUrls] = useState<string[]>([]);
+  const [bannerLinks, setBannerLinks] = useState<string[]>([]);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [error, setError] = useState('');
@@ -31,6 +32,7 @@ export default function SettingsAdminPage() {
       if (data) {
         setS(data);
         setBannerUrls(data.banner_urls ?? (data.banner_url ? [data.banner_url] : []));
+        setBannerLinks(data.banner_links ?? []);
         setAreas((data.delivery_areas ?? []).map((a: { name: string; fee: number }) => ({ name: a.name, fee: String(a.fee) })));
         const oh = data.opening_hours ?? {};
         setHours(
@@ -84,6 +86,7 @@ export default function SettingsAdminPage() {
       const toUpload = Array.from(files).slice(0, room);
       const urls = await Promise.all(toUpload.map(uploadFile));
       setBannerUrls((prev) => [...prev, ...urls].slice(0, 4));
+      setBannerLinks((prev) => [...prev, ...urls.map(() => '')].slice(0, 4));
     } catch {
       setError('Erro ao enviar o(s) banner(s).');
     } finally {
@@ -91,7 +94,18 @@ export default function SettingsAdminPage() {
     }
   };
 
-  const removeBanner = (i: number) => setBannerUrls((prev) => prev.filter((_, j) => j !== i));
+  const removeBanner = (i: number) => {
+    setBannerUrls((prev) => prev.filter((_, j) => j !== i));
+    setBannerLinks((prev) => prev.filter((_, j) => j !== i));
+  };
+
+  const setBannerLink = (i: number, link: string) =>
+    setBannerLinks((prev) => {
+      const next = [...prev];
+      while (next.length <= i) next.push('');
+      next[i] = link;
+      return next;
+    });
 
   const save = async () => {
     setSaving(true);
@@ -103,6 +117,7 @@ export default function SettingsAdminPage() {
         logo_url: s.logo_url,
         banner_url: bannerUrls[0] ?? null,
         banner_urls: bannerUrls,
+        banner_links: bannerUrls.map((_, i) => bannerLinks[i]?.trim() || ''),
         phone: s.phone,
         whatsapp: s.whatsapp,
         address: s.address,
@@ -165,17 +180,25 @@ export default function SettingsAdminPage() {
           {bannerUrls.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {bannerUrls.map((url, i) => (
-                <div key={i} className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt="" className="w-full h-20 rounded-lg object-cover border border-neutral-200" />
-                  <button
-                    type="button"
-                    onClick={() => removeBanner(i)}
-                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white border border-neutral-300 text-neutral-500 hover:text-red-500 grid place-items-center text-sm"
-                    title="Remover"
-                  >
-                    ×
-                  </button>
+                <div key={i} className="space-y-1">
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="w-full h-20 rounded-lg object-cover border border-neutral-200" />
+                    <button
+                      type="button"
+                      onClick={() => removeBanner(i)}
+                      className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-white border border-neutral-300 text-neutral-500 hover:text-red-500 grid place-items-center text-sm"
+                      title="Remover"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <input
+                    className="input !text-xs !py-1.5"
+                    placeholder="Link (opcional)"
+                    value={bannerLinks[i] ?? ''}
+                    onChange={(e) => setBannerLink(i, e.target.value)}
+                  />
                 </div>
               ))}
             </div>
@@ -193,7 +216,10 @@ export default function SettingsAdminPage() {
               {uploadingBanner && <span className="text-xs text-neutral-400">enviando...</span>}
             </div>
           )}
-          <p className="text-xs text-neutral-400">Recomendado: imagens na proporção 16:6 (largas e baixas).</p>
+          <p className="text-xs text-neutral-400">
+            Recomendado: imagens na proporção 16:6 (largas e baixas). O link pode ser uma URL completa
+            (ex.: https://wa.me/...) ou um caminho da loja (ex.: /produto/123).
+          </p>
         </div>
         {error && <p className="text-sm text-red-500">{error}</p>}
         <div className="grid grid-cols-2 gap-2">

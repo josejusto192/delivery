@@ -61,7 +61,10 @@ export default function MenuBrowser({
     <div className="pb-6">
       {settings && (
         <section className="-mx-4 mb-5 md:mx-0 md:rounded-2xl md:overflow-hidden">
-          <BannerSlider urls={settings.banner_urls?.length ? settings.banner_urls : settings.banner_url ? [settings.banner_url] : []} />
+          <BannerSlider
+            urls={settings.banner_urls?.length ? settings.banner_urls : settings.banner_url ? [settings.banner_url] : []}
+            links={settings.banner_links ?? []}
+          />
           <p className="mx-4 mt-3 text-xs text-neutral-500 md:mx-0">
             🛵 {feeLabel} · hoje, {settings.delivery_time_min}–{settings.delivery_time_max} min
             {Number(settings.min_order) > 0 && <> · mínimo {brl(Number(settings.min_order))}</>}
@@ -170,7 +173,7 @@ function ProductCard({ product }: { product: Product }) {
   );
 }
 
-function BannerSlider({ urls }: { urls: string[] }) {
+function BannerSlider({ urls, links }: { urls: string[]; links: string[] }) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -183,17 +186,30 @@ function BannerSlider({ urls }: { urls: string[] }) {
 
   return (
     <div className="relative w-full h-36 sm:h-48 md:h-64 lg:h-80 overflow-hidden">
-      {urls.map((url, i) => (
+      {urls.map((url, i) => {
+        const link = links[i]?.trim();
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={url}
-          src={url}
-          alt=""
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-            i === index ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-      ))}
+        const img = (
+          <img
+            src={url}
+            alt=""
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
+              i === index ? 'opacity-100' : 'opacity-0'
+            } ${link ? 'cursor-pointer' : ''}`}
+          />
+        );
+        if (!link) return <div key={url}>{img}</div>;
+        const external = /^https?:\/\//i.test(link);
+        return external ? (
+          <a key={url} href={link} target="_blank" rel="noreferrer" aria-label="Banner">
+            {img}
+          </a>
+        ) : (
+          <Link key={url} href={link} aria-label="Banner">
+            {img}
+          </Link>
+        );
+      })}
       {urls.length > 1 && (
         <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5">
           {urls.map((_, i) => (

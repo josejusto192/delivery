@@ -4,6 +4,7 @@ export type StoreSettings = {
   logo_url: string | null;
   banner_url: string | null;
   banner_urls: string[];
+  banner_links: string[];
   delivery_time_min: number;
   delivery_time_max: number;
   phone: string | null;
