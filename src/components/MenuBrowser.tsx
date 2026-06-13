@@ -194,18 +194,30 @@ function BannerSlider({ urls, links }: { urls: string[]; links: string[] }) {
             src={url}
             alt=""
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${
-              i === index ? 'opacity-100' : 'opacity-0'
+              i === index ? 'opacity-100' : 'opacity-0 pointer-events-none'
             } ${link ? 'cursor-pointer' : ''}`}
           />
         );
         if (!link) return <div key={url}>{img}</div>;
         const external = /^https?:\/\//i.test(link);
         return external ? (
-          <a key={url} href={link} target="_blank" rel="noreferrer" aria-label="Banner">
+          <a
+            key={url}
+            href={link}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Banner"
+            className={i === index ? '' : 'pointer-events-none'}
+          >
             {img}
           </a>
         ) : (
-          <Link key={url} href={link} aria-label="Banner">
+          <Link
+            key={url}
+            href={link}
+            aria-label="Banner"
+            className={i === index ? '' : 'pointer-events-none'}
+          >
             {img}
           </Link>
         );
