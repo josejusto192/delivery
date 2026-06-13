@@ -32,6 +32,9 @@ export default async function AccountPage() {
         <Link href="/conta/enderecos" className="block px-5 py-4 font-medium hover:bg-neutral-50">
           Meus endereços →
         </Link>
+        <Link href="/indicacao" className="block px-5 py-4 font-medium hover:bg-neutral-50">
+          Indique e ganhe →
+        </Link>
         {profile?.role === 'admin' && (
           <Link href="/admin" className="block px-5 py-4 font-medium text-brand hover:bg-neutral-50">
             Painel da loja →

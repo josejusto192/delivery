@@ -130,6 +130,11 @@ export default function SettingsAdminPage() {
         delivery_areas: areas
           .filter((a) => a.name.trim())
           .map((a) => ({ name: a.name.trim(), fee: Number(a.fee) || 0 })),
+        referral_enabled: s.referral_enabled,
+        referral_percent: Number(s.referral_percent) || 0,
+        referral_min_order: Number(s.referral_min_order) || 0,
+        referral_title: s.referral_title,
+        referral_description: s.referral_description,
         opening_hours: Object.fromEntries(
           DAY_KEYS.map((d) => [d, hours[d].enabled ? [[hours[d].start, hours[d].end]] : []])
         ),
@@ -329,6 +334,33 @@ export default function SettingsAdminPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card p-4 space-y-3">
+        <h3 className="font-semibold">Programa de indicação</h3>
+        <label className="flex items-center justify-between text-sm font-medium">
+          Ativado
+          <button
+            onClick={() => set({ referral_enabled: !s.referral_enabled })}
+            className={`rounded-full px-4 py-1.5 text-xs font-bold ${
+              s.referral_enabled ? 'bg-green-100 text-green-700' : 'bg-neutral-200 text-neutral-500'
+            }`}
+          >
+            {s.referral_enabled ? 'ATIVO' : 'INATIVO'}
+          </button>
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs text-neutral-500">
+            Desconto (%)
+            <input className="input mt-1" type="number" step="0.01" value={s.referral_percent} onChange={(e) => set({ referral_percent: Number(e.target.value) })} />
+          </label>
+          <label className="text-xs text-neutral-500">
+            Pedido mínimo (R$)
+            <input className="input mt-1" type="number" step="0.01" value={s.referral_min_order} onChange={(e) => set({ referral_min_order: Number(e.target.value) })} />
+          </label>
+        </div>
+        <input className="input" placeholder="Título da página /indicacao" value={s.referral_title} onChange={(e) => set({ referral_title: e.target.value })} />
+        <textarea className="input" rows={2} placeholder="Descrição" value={s.referral_description} onChange={(e) => set({ referral_description: e.target.value })} />
       </div>
 
       <button className="btn-brand w-full" onClick={save} disabled={saving}>

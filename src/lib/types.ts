@@ -16,6 +16,11 @@ export type StoreSettings = {
   delivery_fee: number;
   min_order: number;
   delivery_areas: { name: string; fee: number }[];
+  referral_enabled: boolean;
+  referral_percent: number;
+  referral_min_order: number;
+  referral_title: string;
+  referral_description: string;
 };
 
 export type Category = {

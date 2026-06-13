@@ -12,8 +12,9 @@ function AuthForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get('next') ?? '/conta';
+  const ref = params.get('ref') ?? '';
 
-  const [mode, setMode] = useState<Mode>('login');
+  const [mode, setMode] = useState<Mode>(ref ? 'signup' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -40,7 +41,7 @@ function AuthForm() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { name: name.trim(), whatsapp: whatsapp.trim(), birth_date: birthDate } },
+          options: { data: { name: name.trim(), whatsapp: whatsapp.trim(), birth_date: birthDate, referral_code: ref } },
         });
         if (error) throw new Error(error.message);
         setMessage('Conta criada! Verifique seu e-mail para confirmar (se exigido) e faça login.');
@@ -64,6 +65,12 @@ function AuthForm() {
       <h1 className="text-2xl font-bold text-center">
         {mode === 'login' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Recuperar senha'}
       </h1>
+
+      {ref && mode === 'signup' && (
+        <p className="text-sm text-center text-green-600 -mt-2">
+          Você foi indicado com o código <strong>{ref}</strong> — ganhe um cupom de desconto ao se cadastrar!
+        </p>
+      )}
 
       <form className="card p-5 space-y-3" onSubmit={submit}>
         {mode === 'signup' && (
