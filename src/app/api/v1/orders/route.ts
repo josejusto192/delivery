@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
   if (orderError || !order) {
     console.error(orderError);
-    return NextResponse.json({ error: 'Não foi possível criar o pedido.' }, { status: 500 });
+    return NextResponse.json({ error: 'Não foi possível criar o pedido.', details: orderError?.message }, { status: 500 });
   }
 
   const { error: itemsError } = await supabase
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
   if (itemsError) {
     console.error(itemsError);
     await supabase.from('orders').delete().eq('id', order.id);
-    return NextResponse.json({ error: 'Não foi possível salvar os itens do pedido.' }, { status: 500 });
+    return NextResponse.json({ error: 'Não foi possível salvar os itens do pedido.', details: itemsError.message }, { status: 500 });
   }
 
   // busca o pedido com os totais já recalculados pelo trigger + itens
