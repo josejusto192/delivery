@@ -1,0 +1,184 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('When chat message received').item.json.chatInput }}",
+        "options": {
+          "systemMessage": "=Você é o assistente de atendimento da [Nome da Loja]. Seu objetivo é ajudar o cliente\n\nCliente atual:\nnome:\n{{ $json.name }}\nemail:\n{{ $json.email }}\nid:\n{{ $json.id }}\na montar e finalizar o pedido via WhatsApp.\n## Fluxo para criar um pedido\n1. CATÁLOGO: antes de montar o pedido, use a tool \"consultar_catalogo\" para obter a\n   lista de produtos disponíveis (id, nome, preço, adicionais). NUNCA invente\n   product_id, nomes de produtos ou adicionais — use exatamente os valores\n   retornados pelo catálogo.\n2. COLETE com o cliente, na conversa:\n   - Itens desejados (produto + quantidade + adicionais, se houver + observações,\n     ex: \"sem cebola\")\n   - Nome completo do cliente\n   - Tipo de entrega: \"delivery\" (entrega) ou \"pickup\" (retirada no local)\n   - Se \"delivery\": endereço completo — rua, número e bairro são OBRIGATÓRIOS\n     (complemento é opcional)\n   - Forma de pagamento: \"pix\", \"card\" (cartão) ou \"cash\" (dinheiro)\n   - Se pagamento em dinheiro: pergunte se vai precisar de troco e para quanto\n     (campo change_for)\n   - Cupom de desconto, se o cliente tiver um (opcional)\n3. CONFIRME o pedido com o cliente antes de criar — repita os itens, endereço\n   (se entrega), forma de pagamento e total estimado, e só prossiga após\n   confirmação explícita (\"sim\", \"confirma\", \"pode mandar\").\n4. CRIE O PEDIDO usando a tool \"criar_pedido\" com este formato exato:\n   {\n     \"customer_name\": \"<nome do cliente>\",\n     \"customer_whatsapp\": \"<telefone com DDI e DDD, só números, ex: 5511999998888>\",\n     \"fulfillment\": \"delivery\" | \"pickup\",\n     \"address\": {                          // só se fulfillment = \"delivery\"\n       \"street\": \"<rua>\",\n       \"number\": \"<número>\",\n       \"neighborhood\": \"<bairro>\",\n       \"complement\": \"<complemento ou vazio>\"\n     },\n     \"payment_method\": \"pix\" | \"card\" | \"cash\",\n     \"change_for\": <número ou omitir>,     // só se payment_method = \"cash\" e precisar de troco\n     \"channel\": \"whatsapp\",\n     \"notes\": \"<observações gerais do pedido ou vazio>\",\n     \"coupon_code\": \"<código do cupom ou omitir>\",\n     \"items\": [\n       {\n         \"product_id\": \"<id exato vindo do catálogo>\",\n         \"quantity\": <número inteiro >= 1>,\n         \"addons\": [\"<nome exato do adicional>\", ...],   // omitir se não houver\n         \"notes\": \"<observação do item, ex: 'sem cebola', ou vazio>\"\n       }\n     ]\n   }\n## Regras importantes\n- NUNCA calcule ou informe preços/totais por conta própria — eles vêm da\n  resposta da tool \"criar_pedido\" (campos subtotal, delivery_fee, discount, total).\n- NUNCA invente product_id ou nomes de adicionais; sempre confira no catálogo.\n- \"fulfillment\" e \"payment_method\" devem ser exatamente um dos valores aceitos\n  (não traduza nem mude para outras palavras).\n- Se a tool retornar erro (ex: produto inválido, campo faltando), explique o\n  problema ao cliente em linguagem simples e corrija antes de tentar de novo.\n- Após criar o pedido com sucesso, informe ao cliente o código do pedido (code)\n  e o link de acompanhamento (tracking_url)."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [-160, -192],
+      "id": "0edcc054-fce9-41e6-854d-42fe397593fd",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [-800, -192],
+      "id": "7c0bbba4-0948-4fec-9a0b-cb449a8f2c5b",
+      "name": "When chat message received",
+      "webhookId": "83e5b85d-4a5b-4e9c-9d2e-463266c4a9f2"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.whatsapp }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [0, 48],
+      "id": "54429f60-cb18-458f-951f-127c4f9cf453",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": { "id": "nuElilHfVS7ktYMD", "name": "delivery" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": { "__rl": true, "value": "public", "mode": "list", "cachedResultName": "public" },
+        "table": { "__rl": true, "value": "products", "mode": "list", "cachedResultName": "products" },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [128, 48],
+      "id": "2de27bf3-0732-4be7-a778-1a6a0273bc5d",
+      "name": "cardapio",
+      "credentials": {
+        "postgres": { "id": "nuElilHfVS7ktYMD", "name": "delivery" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": { "__rl": true, "value": "public", "mode": "list", "cachedResultName": "public" },
+        "table": { "__rl": true, "value": "categories", "mode": "list", "cachedResultName": "categories" },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [240, 48],
+      "id": "b09d6631-880d-4db6-a391-b0ffc9207f3f",
+      "name": "categorias",
+      "credentials": {
+        "postgres": { "id": "nuElilHfVS7ktYMD", "name": "delivery" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": { "__rl": true, "value": "public", "mode": "list", "cachedResultName": "public" },
+        "table": { "__rl": true, "value": "profiles", "mode": "list", "cachedResultName": "profiles" },
+        "where": {
+          "values": [
+            { "column": "whatsapp", "value": "={{ $('When chat message received').item.json.whatsapp }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [352, 48],
+      "id": "a51a3bee-fa38-4d5e-aca1-68cee7f86c52",
+      "name": "ver perfil",
+      "credentials": {
+        "postgres": { "id": "nuElilHfVS7ktYMD", "name": "delivery" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://delivery.josejusto.com.br/api/v1/orders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer DELIVERY_API_KEY" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $fromAI('JSON', 'Objeto JSON completo do pedido a ser criado. NUNCA envie vazio, null, {} ou []. Formato exato: {\\\"customer_name\\\": \\\"string\\\", \\\"customer_whatsapp\\\": \\\"string com DDI+DDD só números\\\", \\\"fulfillment\\\": \\\"delivery ou pickup\\\", \\\"address\\\": {\\\"street\\\": \\\"string\\\", \\\"number\\\": \\\"string\\\", \\\"neighborhood\\\": \\\"string\\\", \\\"complement\\\": \\\"string opcional\\\"}, \\\"payment_method\\\": \\\"pix, card ou cash\\\", \\\"change_for\\\": \\\"número opcional\\\", \\\"channel\\\": \\\"whatsapp\\\", \\\"notes\\\": \\\"string opcional\\\", \\\"coupon_code\\\": \\\"string opcional\\\", \\\"items\\\": [{\\\"product_id\\\": \\\"uuid do catálogo\\\", \\\"quantity\\\": \\\"inteiro >=1\\\", \\\"addons\\\": [\\\"nomes opcionais\\\"], \\\"notes\\\": \\\"string opcional\\\"}]}. address só se fulfillment=delivery. Use product_id e addons exatamente como retornados pela tool cardapio.', 'json') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
+      "position": [512, 48],
+      "id": "23fb2856-e858-42d6-b47a-f2fd4e97328c",
+      "name": "criar pedido"
+    },
+    {
+      "parameters": {
+        "model": { "__rl": true, "mode": "list", "value": "gpt-5-mini" },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [-304, 16],
+      "id": "1bc0a4e4-42cb-4475-baf2-58bf30b3bc5a",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": { "id": "l2eqk1lhIRrTApqu", "name": "Secretaria" }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": { "__rl": true, "value": "public", "mode": "list", "cachedResultName": "public" },
+        "table": { "__rl": true, "value": "profiles", "mode": "list", "cachedResultName": "profiles" },
+        "where": {
+          "values": [
+            { "column": "whatsapp", "value": "={{ $json.whatsapp }}" }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [-576, -192],
+      "id": "cb9c51a9-a9d4-4f8f-85c5-29d4aff930f3",
+      "name": "Select rows from a table",
+      "credentials": {
+        "postgres": { "id": "nuElilHfVS7ktYMD", "name": "delivery" }
+      }
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [[{ "node": "Select rows from a table", "type": "main", "index": 0 }]]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [[{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]]
+    },
+    "cardapio": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "categorias": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "ver perfil": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "criar pedido": {
+      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Select rows from a table": {
+      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4386e63f5e4c857a43fba4beb13e8c9691e78ce0f2a55acd30ea799ce0730b1d"
+  }
+}
