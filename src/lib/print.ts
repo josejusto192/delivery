@@ -5,7 +5,7 @@ export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
-export function printOrder(order: Order) {
+export function printOrder(order: Order, customerNote?: string) {
   const addr = order.address;
   const win = window.open('', '_blank', 'width=380,height=600');
   if (!win) return;
@@ -58,6 +58,7 @@ export function printOrder(order: Order) {
         <hr />
         <div class="total-line"><span>TOTAL</span><span>${brl(Number(order.total))}</span></div>
         ${order.notes ? `<hr /><p>Obs.: ${escapeHtml(order.notes)}</p>` : ''}
+        ${customerNote?.trim() ? `<hr /><p><strong>Obs. sobre o cliente:</strong><br/>${escapeHtml(customerNote.trim())}</p>` : ''}
       </body>
     </html>
   `);

@@ -145,9 +145,19 @@ export type Order = {
   total: number;
   coupon_code: string | null;
   notes: string | null;
+  issue_type: string | null;
+  issue_notes: string | null;
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];
+};
+
+export const ISSUE_TYPE_LABELS: Record<string, string> = {
+  no_show: 'Cliente não atendeu / ausente',
+  refused: 'Cliente recusou o pedido',
+  returned: 'Pedido devolvido',
+  wrong_address: 'Endereço incorreto / difícil acesso',
+  other: 'Outro problema',
 };
 
 export const PAYMENT_LABELS = {

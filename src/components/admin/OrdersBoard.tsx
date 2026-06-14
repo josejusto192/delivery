@@ -7,6 +7,7 @@ import { printOrder } from '@/lib/print';
 import {
   ORDER_STATUS_FLOW,
   ORDER_STATUS_LABELS,
+  ISSUE_TYPE_LABELS,
   PAYMENT_LABELS,
   type Order,
   type OrderStatus,
@@ -344,6 +345,11 @@ export default function OrdersBoard() {
           order={orders.find((o) => o.id === detail.id) ?? detail}
           onClose={() => setDetail(null)}
           onStatus={updateStatus}
+          onIssue={async (id, issue_type, issue_notes) => {
+            setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, issue_type, issue_notes } : o)));
+            setDetail((d) => (d && d.id === id ? { ...d, issue_type, issue_notes } : d));
+            await supabase.from('orders').update({ issue_type, issue_notes }).eq('id', id);
+          }}
         />
       )}
     </div>
@@ -376,7 +382,9 @@ function KanbanCard({
     >
       <button onClick={onOpen} className="w-full text-left">
         <div className="flex items-center justify-between gap-2">
-          <span className="font-bold text-sm">#{order.code}</span>
+          <span className="font-bold text-sm">
+            #{order.code} {order.issue_type && <span title={ISSUE_TYPE_LABELS[order.issue_type]}>⚠️</span>}
+          </span>
           <span className="text-[11px] text-neutral-400">há {minutesAgo(order.created_at)}</span>
         </div>
         <p className="text-sm truncate mt-1">{order.customer_name}</p>
@@ -414,13 +422,65 @@ function OrderDetailModal({
   order,
   onClose,
   onStatus,
+  onIssue,
 }: {
   order: Order;
   onClose: () => void;
   onStatus: (id: string, status: OrderStatus) => void;
+  onIssue: (id: string, issueType: string | null, issueNotes: string | null) => void;
 }) {
+  const supabase = useMemo(() => createClient(), []);
   const next = nextStatus(order);
   const addr = order.address;
+
+  const [showIssueForm, setShowIssueForm] = useState(false);
+  const [issueType, setIssueType] = useState(order.issue_type ?? '');
+  const [issueNotes, setIssueNotes] = useState(order.issue_notes ?? '');
+
+  const [customerNote, setCustomerNote] = useState('');
+  const [savedCustomerNote, setSavedCustomerNote] = useState('');
+  const [noteLoading, setNoteLoading] = useState(true);
+  const [noteSaved, setNoteSaved] = useState(false);
+
+  useEffect(() => {
+    setIssueType(order.issue_type ?? '');
+    setIssueNotes(order.issue_notes ?? '');
+  }, [order.id, order.issue_type, order.issue_notes]);
+
+  useEffect(() => {
+    setNoteLoading(true);
+    supabase
+      .from('customer_notes')
+      .select('note')
+      .eq('customer_whatsapp', order.customer_whatsapp)
+      .maybeSingle()
+      .then(({ data }) => {
+        setCustomerNote(data?.note ?? '');
+        setSavedCustomerNote(data?.note ?? '');
+        setNoteLoading(false);
+      });
+  }, [supabase, order.customer_whatsapp]);
+
+  const saveCustomerNote = async () => {
+    await supabase
+      .from('customer_notes')
+      .upsert({ customer_whatsapp: order.customer_whatsapp, note: customerNote, updated_at: new Date().toISOString() });
+    setSavedCustomerNote(customerNote);
+    setNoteSaved(true);
+    setTimeout(() => setNoteSaved(false), 2000);
+  };
+
+  const saveIssue = () => {
+    onIssue(order.id, issueType || null, issueType ? issueNotes.trim() || null : null);
+    setShowIssueForm(false);
+  };
+
+  const clearIssue = () => {
+    setIssueType('');
+    setIssueNotes('');
+    onIssue(order.id, null, null);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div
@@ -494,10 +554,90 @@ function OrderDetailModal({
             {order.notes && <p>Obs.: {order.notes}</p>}
           </div>
 
+          {/* observações sobre o cliente (persistente, aparece em todos os pedidos dele) */}
+          <div className="bg-amber-50 rounded-lg p-3 space-y-2">
+            <h3 className="text-sm font-semibold">📝 Observações sobre o cliente</h3>
+            {noteLoading ? (
+              <p className="text-xs text-neutral-400">Carregando...</p>
+            ) : (
+              <>
+                <textarea
+                  className="input text-sm"
+                  rows={2}
+                  placeholder="Ex.: endereço de difícil acesso, já recusou pedido antes..."
+                  value={customerNote}
+                  onChange={(e) => setCustomerNote(e.target.value)}
+                />
+                <div className="flex items-center gap-2">
+                  <button
+                    className="border border-neutral-300 rounded-lg px-3 py-1.5 text-xs font-semibold bg-white disabled:opacity-50"
+                    onClick={saveCustomerNote}
+                    disabled={customerNote === savedCustomerNote}
+                  >
+                    Salvar
+                  </button>
+                  {noteSaved && <span className="text-xs text-green-600">Salvo ✓</span>}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* registro de problema no pedido */}
+          {order.issue_type && !showIssueForm ? (
+            <div className="bg-red-50 rounded-lg p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-red-600">⚠️ {ISSUE_TYPE_LABELS[order.issue_type] ?? order.issue_type}</h3>
+                <div className="flex gap-2 shrink-0">
+                  <button className="text-xs font-semibold text-neutral-500" onClick={() => setShowIssueForm(true)}>
+                    Editar
+                  </button>
+                  <button className="text-xs font-semibold text-neutral-500" onClick={clearIssue}>
+                    Remover
+                  </button>
+                </div>
+              </div>
+              {order.issue_notes && <p className="text-sm text-neutral-600">{order.issue_notes}</p>}
+            </div>
+          ) : showIssueForm ? (
+            <div className="bg-red-50 rounded-lg p-3 space-y-2">
+              <h3 className="text-sm font-semibold">Registrar problema no pedido</h3>
+              <select className="input text-sm" value={issueType} onChange={(e) => setIssueType(e.target.value)}>
+                <option value="">Selecione o tipo de problema</option>
+                {Object.entries(ISSUE_TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                className="input text-sm"
+                rows={2}
+                placeholder="Detalhes do ocorrido..."
+                value={issueNotes}
+                onChange={(e) => setIssueNotes(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <button className="border border-neutral-300 rounded-lg px-3 py-1.5 text-xs font-semibold bg-white" onClick={() => setShowIssueForm(false)}>
+                  Cancelar
+                </button>
+                <button className="bg-red-500 text-white rounded-lg px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={saveIssue} disabled={!issueType}>
+                  Salvar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="text-xs font-semibold text-red-500 self-start"
+              onClick={() => setShowIssueForm(true)}
+            >
+              ⚠️ Registrar problema no pedido
+            </button>
+          )}
+
           <div className="flex gap-2 pt-1">
             <button
               className="border border-neutral-300 rounded-lg px-4 py-2.5 text-sm font-semibold bg-white"
-              onClick={() => printOrder(order)}
+              onClick={() => printOrder(order, savedCustomerNote)}
             >
               🖨️ Imprimir
             </button>
