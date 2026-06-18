@@ -20,6 +20,8 @@ export default function TablesBoard({ products, categories }: { products: Produc
   const [closeChangeFor, setCloseChangeFor] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [nameDraft, setNameDraft] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -43,6 +45,24 @@ export default function TablesBoard({ products, categories }: { products: Produc
   }, [supabase, load]);
 
   const activeTab = activeTableNumber != null ? tabs.find((t) => t.table_number === activeTableNumber) ?? null : null;
+
+  useEffect(() => {
+    setNameDraft(activeTab && !activeTab.customer_name.startsWith('Mesa ') ? activeTab.customer_name : '');
+  }, [activeTab?.id]);
+
+  const saveName = async () => {
+    if (!activeTab) return;
+    const name = nameDraft.trim() || `Mesa ${activeTab.table_number}`;
+    setSavingName(true);
+    const { error: updateError } = await supabase.from('orders').update({ customer_name: name }).eq('id', activeTab.id);
+    setSavingName(false);
+    if (updateError) {
+      console.error(updateError);
+      setError('Não foi possível salvar o nome.');
+      return;
+    }
+    await load();
+  };
 
   const visibleProducts = useMemo(() => {
     if (!activeCategory) return products;
@@ -143,14 +163,26 @@ export default function TablesBoard({ products, categories }: { products: Produc
     const itemsTotal = (activeTab.order_items ?? []).reduce((s, i) => s + Number(i.total), 0);
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <h1 className="text-xl font-bold">Mesa {activeTab.table_number}</h1>
             <p className="text-sm text-neutral-500">Comanda aberta · {brl(itemsTotal)}</p>
           </div>
-          <button className="text-sm font-semibold text-neutral-500" onClick={() => setActiveTableNumber(null)}>
+          <button className="text-sm font-semibold text-neutral-500 shrink-0" onClick={() => setActiveTableNumber(null)}>
             ← Voltar às mesas
           </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            className="input flex-1"
+            placeholder="Nome do responsável (opcional)"
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={(e) => e.key === 'Enter' && saveName()}
+          />
+          {savingName && <span className="text-xs text-neutral-400 shrink-0">salvando...</span>}
         </div>
 
         {error && <p className="text-sm text-red-500">{error}</p>}
@@ -295,6 +327,9 @@ export default function TablesBoard({ products, categories }: { products: Produc
               }`}
             >
               <span className="text-2xl font-bold">{String(n).padStart(2, '0')}</span>
+              {tab && !tab.customer_name.startsWith('Mesa ') && (
+                <span className="text-[10px] px-1 truncate max-w-full">{tab.customer_name}</span>
+              )}
               <span className="text-[11px] uppercase tracking-wide">{tab ? brl(itemsTotal) : 'Livre'}</span>
             </button>
           );
