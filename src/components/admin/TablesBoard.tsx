@@ -9,6 +9,8 @@ import type { Category, Order, Product } from '@/lib/types';
 
 const TABLE_COUNT = 12;
 
+type ClientSuggestion = { id: string; name: string; whatsapp: string | null };
+
 export default function TablesBoard({ products, categories }: { products: Product[]; categories: Category[] }) {
   const supabase = useMemo(() => createClient(), []);
   const [tabs, setTabs] = useState<Order[]>([]);
@@ -22,6 +24,8 @@ export default function TablesBoard({ products, categories }: { products: Produc
   const [error, setError] = useState('');
   const [nameDraft, setNameDraft] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [suggestions, setSuggestions] = useState<ClientSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -48,19 +52,43 @@ export default function TablesBoard({ products, categories }: { products: Produc
 
   useEffect(() => {
     setNameDraft(activeTab && !activeTab.customer_name.startsWith('Mesa ') ? activeTab.customer_name : '');
+    setSuggestions([]);
+    setShowSuggestions(false);
   }, [activeTab?.id]);
 
-  const saveName = async () => {
+  useEffect(() => {
+    const q = nameDraft.trim();
+    if (q.length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      const { data } = await supabase.from('profiles').select('id,name,whatsapp').ilike('name', `%${q}%`).limit(6);
+      setSuggestions((data ?? []) as ClientSuggestion[]);
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [nameDraft, supabase]);
+
+  const saveName = async (client?: ClientSuggestion) => {
     if (!activeTab) return;
-    const name = nameDraft.trim() || `Mesa ${activeTab.table_number}`;
+    const name = client?.name ?? nameDraft.trim() ?? '';
+    setShowSuggestions(false);
     setSavingName(true);
-    const { error: updateError } = await supabase.from('orders').update({ customer_name: name }).eq('id', activeTab.id);
+    const { error: updateError } = await supabase
+      .from('orders')
+      .update({
+        customer_name: name || `Mesa ${activeTab.table_number}`,
+        user_id: client?.id ?? activeTab.user_id,
+        customer_whatsapp: client?.whatsapp || activeTab.customer_whatsapp,
+      })
+      .eq('id', activeTab.id);
     setSavingName(false);
     if (updateError) {
       console.error(updateError);
       setError('Não foi possível salvar o nome.');
       return;
     }
+    if (client) setNameDraft(client.name);
     await load();
   };
 
@@ -173,16 +201,37 @@ export default function TablesBoard({ products, categories }: { products: Produc
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative">
           <input
             className="input flex-1"
-            placeholder="Nome do responsável (opcional)"
+            placeholder="Nome do responsável (busque um cliente ou digite)"
             value={nameDraft}
             onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={saveName}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => {
+              setTimeout(() => setShowSuggestions(false), 150);
+              saveName();
+            }}
             onKeyDown={(e) => e.key === 'Enter' && saveName()}
           />
           {savingName && <span className="text-xs text-neutral-400 shrink-0">salvando...</span>}
+          {showSuggestions && suggestions.length > 0 && (
+            <ul className="absolute top-full left-0 right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+              {suggestions.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-neutral-50 flex flex-col"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => saveName(c)}
+                  >
+                    <span className="font-medium">{c.name}</span>
+                    {c.whatsapp && <span className="text-xs text-neutral-400">{c.whatsapp}</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-500">{error}</p>}
