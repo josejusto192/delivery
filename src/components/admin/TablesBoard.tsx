@@ -266,10 +266,7 @@ export default function TablesBoard({ products, categories }: { products: Produc
                 return (
                   <button
                     key={p.id}
-                    onClick={() => {
-                      if ((p.addon_groups ?? []).length > 0) setModalProduct(p);
-                      else addItem({ productId: p.id, name: p.name, unitPrice: price, quantity: 1, addons: [], notes: '' });
-                    }}
+                    onClick={() => setModalProduct(p)}
                     className="card p-3 text-left hover:border-brand"
                   >
                     <p className="font-semibold text-sm leading-snug">{p.name}</p>

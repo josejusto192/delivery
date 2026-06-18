@@ -13,7 +13,7 @@ import {
   type OrderStatus,
 } from '@/lib/types';
 
-const KANBAN_COLUMNS: OrderStatus[] = ['new', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+const KANBAN_COLUMNS: OrderStatus[] = ['open_tab', 'new', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
 const ACTIVE_STATUSES = KANBAN_COLUMNS;
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -28,6 +28,7 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 };
 
 const COLUMN_ACCENT: Record<string, string> = {
+  open_tab: 'border-t-neutral-400',
   new: 'border-t-blue-500',
   confirmed: 'border-t-indigo-500',
   preparing: 'border-t-amber-500',
@@ -65,6 +66,7 @@ export default function OrdersBoard() {
   const [notifyOn, setNotifyOn] = useState(false);
   const [autoPrint, setAutoPrint] = useState(false);
   const audioRef = useRef<AudioContext | null>(null);
+  const ordersRef = useRef<Order[]>([]);
 
   useEffect(() => {
     try {
@@ -119,11 +121,23 @@ export default function OrdersBoard() {
     const { data } = await supabase
       .from('orders')
       .select('*, order_items(*)')
-      .neq('status', 'open_tab')
       .order('created_at', { ascending: false })
       .limit(300);
-    setOrders((data ?? []) as Order[]);
+    ordersRef.current = (data ?? []) as Order[];
+    setOrders(ordersRef.current);
   }, [supabase]);
+
+  const alert = useCallback(
+    (title: string, body: string, tag: string) => {
+      if (soundOn) beep(audioRef);
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          new Notification(title, { body, tag });
+        } catch {}
+      }
+    },
+    [soundOn]
+  );
 
   useEffect(() => {
     load();
@@ -131,21 +145,13 @@ export default function OrdersBoard() {
       .channel('orders-board')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
         const o = payload.new as Order;
-        // comandas (mesas) só alertam a cozinha quando fecham e entram no fluxo normal
+        // comandas (mesas) abrem silenciosamente; só uma cozinha pronta para receber
         const isNewKitchenOrder =
           (payload.eventType === 'INSERT' && o.status !== 'open_tab') ||
           (payload.eventType === 'UPDATE' && (payload.old as Order)?.status === 'open_tab' && o.status === 'confirmed');
 
         if (isNewKitchenOrder) {
-          if (soundOn) beep(audioRef);
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            try {
-              new Notification(`Novo pedido #${o.code}`, {
-                body: `${o.customer_name} · ${brl(Number(o.total))}`,
-                tag: `order-${o.id}`,
-              });
-            } catch {}
-          }
+          alert(`Novo pedido #${o.code}`, `${o.customer_name} · ${brl(Number(o.total))}`, `order-${o.id}`);
           if (autoPrint) {
             supabase
               .from('orders')
@@ -159,18 +165,33 @@ export default function OrdersBoard() {
         }
         load();
       })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_items' }, (payload) => {
+        const item = payload.new as { order_id: string; product_name: string; quantity: number };
+        const parent = ordersRef.current.find((o) => o.id === item.order_id);
+        if (parent && parent.status === 'open_tab') {
+          alert(
+            `Item lançado · Mesa ${parent.table_number ?? ''}`,
+            `${item.quantity}x ${item.product_name}`,
+            `tab-item-${item.order_id}-${Date.now()}`
+          );
+        }
+        load();
+      })
       .subscribe();
     const interval = setInterval(load, 30000);
     return () => {
       supabase.removeChannel(channel);
       clearInterval(interval);
     };
-  }, [supabase, load, soundOn, autoPrint]);
+  }, [supabase, load, alert, autoPrint]);
 
   const updateStatus = async (id: string, status: OrderStatus) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
-    setDetail((d) => (d && d.id === id ? { ...d, status } : d));
-    await supabase.from('orders').update({ status }).eq('id', id);
+    const order = orders.find((o) => o.id === id);
+    const freeingTable = status === 'canceled' && order?.status === 'open_tab';
+    const patch = freeingTable ? { status, table_number: null } : { status };
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...patch } : o)));
+    setDetail((d) => (d && d.id === id ? { ...d, ...patch } : d));
+    await supabase.from('orders').update(patch).eq('id', id);
   };
 
   const bySearch = useCallback(
