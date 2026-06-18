@@ -61,6 +61,7 @@ export type Product = {
   active: boolean;
   sort_order: number;
   addon_groups?: AddonGroup[];
+  loyalty_points?: number | null;
 };
 
 export type Coupon = {
@@ -73,6 +74,39 @@ export type Coupon = {
   used_count: number;
   active: boolean;
   expires_at: string | null;
+};
+
+export type Promotion = {
+  id: string;
+  name: string;
+  description: string | null;
+  banner_url: string | null;
+  discount_type: 'percent' | 'fixed';
+  discount_value: number;
+  display_on: string[];
+  starts_at: string | null;
+  ends_at: string | null;
+  active: boolean;
+  created_at: string;
+  promotion_products?: { product_id: string }[];
+};
+
+export type LoyaltySettings = {
+  id: number;
+  enabled: boolean;
+  points_per_currency: number;
+  min_order_to_earn: number;
+};
+
+export type LoyaltyReward = {
+  id: string;
+  name: string;
+  description: string | null;
+  points_cost: number;
+  type: 'discount_percent' | 'discount_fixed' | 'free_product';
+  value: number;
+  product_id: string | null;
+  active: boolean;
 };
 
 export type Address = {
