@@ -80,7 +80,8 @@ export default function ClientsAdminPage() {
         if (existing) {
           existing.orders.push(o);
           existing.total += Number(o.total);
-          existing.payments[o.payment_method] = (existing.payments[o.payment_method] ?? 0) + 1;
+          const paymentKey = o.payment_method ?? 'pendente';
+          existing.payments[paymentKey] = (existing.payments[paymentKey] ?? 0) + 1;
         } else {
           const profile = (o.user_id && byUser.get(o.user_id)) || byPhone.get(phone) || null;
           map.set(key, {
@@ -91,7 +92,7 @@ export default function ClientsAdminPage() {
             orders: [o],
             total: Number(o.total),
             lastOrderAt: o.created_at,
-            payments: { [o.payment_method]: 1 },
+            payments: { [o.payment_method ?? 'pendente']: 1 },
           });
         }
       });
@@ -351,7 +352,7 @@ function ClientDetail({ client, onBack }: { client: Client; onBack: () => void }
               <div className="text-right shrink-0">
                 <p className="font-semibold text-sm">{brl(Number(o.total))}</p>
                 <p className="text-xs text-neutral-500">
-                  {PAYMENT_LABELS[o.payment_method]} · {ORDER_STATUS_LABELS[o.status]}
+                  {o.payment_method ? PAYMENT_LABELS[o.payment_method] : 'pagamento pendente'} · {ORDER_STATUS_LABELS[o.status]}
                 </p>
               </div>
             </div>

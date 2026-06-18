@@ -41,7 +41,13 @@ export function printOrder(order: Order, customerNote?: string) {
         <p class="center">${formatDateTime(order.created_at)}</p>
         <hr />
         <p><strong>${escapeHtml(order.customer_name)}</strong><br/>${escapeHtml(order.customer_whatsapp)}</p>
-        <p>${order.fulfillment === 'delivery' ? 'ENTREGA' : 'RETIRADA'} · ${PAYMENT_LABELS[order.payment_method]}${
+        <p>${
+          order.fulfillment === 'dine_in'
+            ? `MESA ${order.table_number ?? ''}`
+            : order.fulfillment === 'delivery'
+              ? 'ENTREGA'
+              : 'RETIRADA'
+        } · ${order.payment_method ? PAYMENT_LABELS[order.payment_method] : 'pagamento pendente'}${
           order.payment_method === 'cash' && order.change_for ? ` · troco p/ ${brl(Number(order.change_for))}` : ''
         }</p>
         ${

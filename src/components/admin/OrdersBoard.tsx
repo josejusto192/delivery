@@ -17,6 +17,7 @@ const KANBAN_COLUMNS: OrderStatus[] = ['new', 'confirmed', 'preparing', 'ready',
 const ACTIVE_STATUSES = KANBAN_COLUMNS;
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
+  open_tab: 'bg-neutral-200 text-neutral-600',
   new: 'bg-blue-100 text-blue-700',
   confirmed: 'bg-indigo-100 text-indigo-700',
   preparing: 'bg-amber-100 text-amber-700',
@@ -118,6 +119,7 @@ export default function OrdersBoard() {
     const { data } = await supabase
       .from('orders')
       .select('*, order_items(*)')
+      .neq('status', 'open_tab')
       .order('created_at', { ascending: false })
       .limit(300);
     setOrders((data ?? []) as Order[]);
@@ -128,9 +130,14 @@ export default function OrdersBoard() {
     const channel = supabase
       .channel('orders-board')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
+        const o = payload.new as Order;
+        // comandas (mesas) só alertam a cozinha quando fecham e entram no fluxo normal
+        const isNewKitchenOrder =
+          (payload.eventType === 'INSERT' && o.status !== 'open_tab') ||
+          (payload.eventType === 'UPDATE' && (payload.old as Order)?.status === 'open_tab' && o.status === 'confirmed');
+
+        if (isNewKitchenOrder) {
           if (soundOn) beep(audioRef);
-          const o = payload.new as Order;
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
             try {
               new Notification(`Novo pedido #${o.code}`, {
@@ -329,8 +336,8 @@ export default function OrdersBoard() {
                     <span className="text-xs text-neutral-400">{formatDateTime(order.created_at)}</span>
                   </div>
                   <p className="text-sm text-neutral-600 truncate mt-0.5">
-                    {order.customer_name} · {order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'} ·{' '}
-                    {PAYMENT_LABELS[order.payment_method]}
+                    {order.customer_name} · {order.fulfillment === 'delivery' ? 'Entrega' : order.fulfillment === 'dine_in' ? `Mesa ${order.table_number ?? ''}` : 'Retirada'} ·{' '}
+                    {order.payment_method ? PAYMENT_LABELS[order.payment_method] : 'pagamento pendente'}
                   </p>
                 </div>
                 <span className="font-bold shrink-0">{brl(Number(order.total))}</span>
@@ -389,7 +396,7 @@ function KanbanCard({
         </div>
         <p className="text-sm truncate mt-1">{order.customer_name}</p>
         <p className="text-xs text-neutral-500 mt-0.5">
-          {itemsCount} {itemsCount === 1 ? 'item' : 'itens'} · {order.fulfillment === 'delivery' ? '🛵 Entrega' : '🏪 Retirada'} · {PAYMENT_LABELS[order.payment_method]}
+          {itemsCount} {itemsCount === 1 ? 'item' : 'itens'} · {order.fulfillment === 'delivery' ? '🛵 Entrega' : order.fulfillment === 'dine_in' ? `🍽️ Mesa ${order.table_number ?? ''}` : '🏪 Retirada'} · {order.payment_method ? PAYMENT_LABELS[order.payment_method] : 'pagamento pendente'}
         </p>
         <p className="font-bold text-sm mt-1">{brl(Number(order.total))}</p>
       </button>
@@ -535,7 +542,7 @@ function OrderDetailModal({
               </a>
             </p>
             <p>
-              {order.fulfillment === 'delivery' ? 'Entrega' : 'Retirada'} · {PAYMENT_LABELS[order.payment_method]}
+              {order.fulfillment === 'delivery' ? 'Entrega' : order.fulfillment === 'dine_in' ? `Mesa ${order.table_number ?? ''}` : 'Retirada'} · {order.payment_method ? PAYMENT_LABELS[order.payment_method] : 'pagamento pendente'}
               {order.payment_method === 'cash' && order.change_for && <> · troco p/ {brl(Number(order.change_for))}</>}
             </p>
             {addr && (

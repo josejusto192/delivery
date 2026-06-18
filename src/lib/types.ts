@@ -122,6 +122,7 @@ export type Address = {
 };
 
 export type OrderStatus =
+  | 'open_tab'
   | 'new'
   | 'confirmed'
   | 'preparing'
@@ -131,6 +132,7 @@ export type OrderStatus =
   | 'canceled';
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  open_tab: 'Comanda aberta',
   new: 'Novo pedido',
   confirmed: 'Confirmado',
   preparing: 'Em produção',
@@ -167,12 +169,14 @@ export type Order = {
   user_id: string | null;
   customer_name: string;
   customer_whatsapp: string;
-  fulfillment: 'delivery' | 'pickup';
+  fulfillment: 'delivery' | 'pickup' | 'dine_in';
   address: Record<string, string> | null;
-  payment_method: 'pix' | 'card' | 'cash';
+  payment_method: 'pix' | 'card' | 'cash' | null;
   change_for: number | null;
   status: OrderStatus;
-  channel: 'web' | 'counter' | 'phone' | 'whatsapp';
+  channel: 'web' | 'counter' | 'phone' | 'whatsapp' | 'dine_in';
+  table_number: number | null;
+  closed_at: string | null;
   subtotal: number;
   delivery_fee: number;
   discount: number;

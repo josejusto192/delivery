@@ -24,7 +24,7 @@ function I({ d }: { d: string }) {
 const ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/admin/dashboard', icon: <I d="M3 13h8V3H3v10zm10 8h8V11h-8v10zM3 21h8v-6H3v6zm10-12h8V3h-8v6z" /> },
   { label: 'Pedidos', href: '/admin', icon: <I d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /> },
-  { label: 'PDV', href: '/admin/pdv', icon: <I d="M3 7h18M5 7V5a2 2 0 012-2h10a2 2 0 012 2v2m-1 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V7m4 5h4" /> },
+  { label: 'Caixa/PDV', href: '/admin/pdv', icon: <I d="M3 7h18M5 7V5a2 2 0 012-2h10a2 2 0 012 2v2m-1 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V7m4 5h4" /> },
   {
     label: 'Cardápio',
     icon: <I d="M4 6h16M4 10h16M4 14h10M4 18h10" />,

@@ -106,10 +106,11 @@ export default function RelatoriosPage() {
   const paymentBreakdown = useMemo(() => {
     const map = new Map<string, { count: number; revenue: number }>();
     for (const o of validOrders) {
-      const cur = map.get(o.payment_method) ?? { count: 0, revenue: 0 };
+      const method = o.payment_method ?? 'pendente';
+      const cur = map.get(method) ?? { count: 0, revenue: 0 };
       cur.count += 1;
       cur.revenue += Number(o.total);
-      map.set(o.payment_method, cur);
+      map.set(method, cur);
     }
     return [...map.entries()].map(([method, v]) => ({ method, ...v }));
   }, [validOrders]);
@@ -149,8 +150,8 @@ export default function RelatoriosPage() {
         o.customer_name,
         o.customer_whatsapp,
         o.channel,
-        o.fulfillment === 'delivery' ? 'Entrega' : 'Retirada',
-        PAYMENT_LABELS[o.payment_method],
+        o.fulfillment === 'delivery' ? 'Entrega' : o.fulfillment === 'dine_in' ? 'Mesa' : 'Retirada',
+        o.payment_method ? PAYMENT_LABELS[o.payment_method] : 'Pendente',
         o.status,
         Number(o.subtotal).toFixed(2),
         Number(o.delivery_fee).toFixed(2),
