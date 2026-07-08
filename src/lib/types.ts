@@ -21,6 +21,7 @@ export type StoreSettings = {
   referral_min_order: number;
   referral_title: string;
   referral_description: string;
+  default_margin_percent: number;
 };
 
 export type Category = {
@@ -62,6 +63,28 @@ export type Product = {
   sort_order: number;
   addon_groups?: AddonGroup[];
   loyalty_points?: number | null;
+  cost_price: number;
+  margin_percent: number | null;
+  product_ingredients?: ProductIngredient[];
+};
+
+export type Ingredient = {
+  id: string;
+  name: string;
+  unit: 'un' | 'kg';
+  cost_per_unit: number;
+  stock_quantity: number;
+  min_stock: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type ProductIngredient = {
+  id: string;
+  product_id: string;
+  ingredient_id: string;
+  quantity: number;
+  ingredient?: Ingredient;
 };
 
 export type Coupon = {

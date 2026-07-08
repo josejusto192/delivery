@@ -19,6 +19,9 @@ Canal próprio de vendas para restaurantes e deliveries: cardápio digital, carr
 - CRUD de produtos (com upload de imagem) e grupos de adicionais
 - CRUD de categorias com ordenação
 - Configurações: nome, logo, cor da marca, abrir/fechar loja, taxa de entrega, pedido mínimo, áreas de entrega
+- Estoque: cadastro de insumos com valor pago por unidade ou por quilograma, e quantidade em estoque
+- Ficha técnica por produto: seleção dos insumos e quantidade exata usada, com cálculo automático do custo
+  e sugestão de preço de venda com base numa margem de lucro padrão (configurável em Estoque e editável por produto)
 
 ## Como rodar
 

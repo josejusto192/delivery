@@ -3,22 +3,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { brl } from '@/lib/format';
-import type { Category, Product } from '@/lib/types';
+import type { Category, Ingredient, Product, StoreSettings } from '@/lib/types';
 import ProductForm from '@/components/admin/ProductForm';
 
 export default function ProductsAdminPage() {
   const supabase = useMemo(() => createClient(), []);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
 
   const load = async () => {
-    const [{ data: prods }, { data: cats }] = await Promise.all([
-      supabase.from('products').select('*, addon_groups(*, addons(*))').order('sort_order'),
+    const [{ data: prods }, { data: cats }, { data: ings }, { data: s }] = await Promise.all([
+      supabase
+        .from('products')
+        .select('*, addon_groups(*, addons(*)), product_ingredients(*, ingredient:ingredients(*))')
+        .order('sort_order'),
       supabase.from('categories').select('*').order('sort_order'),
+      supabase.from('ingredients').select('*').eq('active', true).order('name'),
+      supabase.from('store_settings').select('*').single(),
     ]);
     setProducts((prods ?? []) as Product[]);
     setCategories(cats ?? []);
+    setIngredients(ings ?? []);
+    setSettings(s ?? null);
   };
 
   useEffect(() => {
@@ -42,6 +51,8 @@ export default function ProductsAdminPage() {
       <ProductForm
         product={editing === 'new' ? null : editing}
         categories={categories}
+        ingredients={ingredients}
+        defaultMarginPercent={settings?.default_margin_percent ?? 30}
         onDone={async () => {
           setEditing(null);
           await load();

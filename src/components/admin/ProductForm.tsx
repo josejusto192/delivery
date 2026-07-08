@@ -2,18 +2,24 @@
 
 import { useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { Category, Product } from '@/lib/types';
+import { brl } from '@/lib/format';
+import type { Category, Ingredient, Product } from '@/lib/types';
 
 type DraftAddon = { name: string; price: string };
 type DraftGroup = { name: string; min: string; max: string; addons: DraftAddon[] };
+type DraftRecipeItem = { ingredientId: string; quantity: string };
 
 export default function ProductForm({
   product,
   categories,
+  ingredients,
+  defaultMarginPercent,
   onDone,
 }: {
   product: Product | null;
   categories: Category[];
+  ingredients: Ingredient[];
+  defaultMarginPercent: number;
   onDone: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
@@ -41,8 +47,39 @@ export default function ProductForm({
           .map((a) => ({ name: a.name, price: String(a.price) })),
       }))
   );
+  const [recipe, setRecipe] = useState<DraftRecipeItem[]>(
+    (product?.product_ingredients ?? []).map((pi) => ({
+      ingredientId: pi.ingredient_id,
+      quantity: String(pi.quantity),
+    }))
+  );
+  const [marginOverride, setMarginOverride] = useState(
+    product?.margin_percent != null ? String(product.margin_percent) : ''
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const ingredientById = useMemo(
+    () => new Map(ingredients.map((i) => [i.id, i])),
+    [ingredients]
+  );
+
+  const costPrice = useMemo(
+    () =>
+      recipe.reduce((sum, item) => {
+        const ing = ingredientById.get(item.ingredientId);
+        const qty = Number(item.quantity) || 0;
+        return sum + (ing ? qty * Number(ing.cost_per_unit) : 0);
+      }, 0),
+    [recipe, ingredientById]
+  );
+
+  const effectiveMargin = marginOverride !== '' ? Number(marginOverride) : defaultMarginPercent;
+  const suggestedPrice =
+    effectiveMargin < 100 ? costPrice / (1 - effectiveMargin / 100) : costPrice;
+
+  const patchRecipeItem = (idx: number, patch: Partial<DraftRecipeItem>) =>
+    setRecipe((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
 
   const patchGroup = (gi: number, patch: Partial<DraftGroup>) =>
     setGroups((prev) => prev.map((g, i) => (i === gi ? { ...g, ...patch } : g)));
@@ -77,6 +114,8 @@ export default function ProductForm({
         category_id: categoryId || null,
         featured,
         image_url: finalImageUrl || null,
+        cost_price: costPrice,
+        margin_percent: marginOverride !== '' ? Number(marginOverride) : null,
       };
 
       let productId = product?.id;
@@ -124,6 +163,22 @@ export default function ProductForm({
         }
       }
 
+      // recria a ficha técnica (insumos usados neste produto)
+      if (product) {
+        await supabase.from('product_ingredients').delete().eq('product_id', productId);
+      }
+      const validRecipe = recipe.filter((r) => r.ingredientId && Number(r.quantity) > 0);
+      if (validRecipe.length) {
+        const { error: re } = await supabase.from('product_ingredients').insert(
+          validRecipe.map((r) => ({
+            product_id: productId,
+            ingredient_id: r.ingredientId,
+            quantity: Number(r.quantity),
+          }))
+        );
+        if (re) throw re;
+      }
+
       onDone();
     } catch (e) {
       console.error(e);
@@ -168,6 +223,117 @@ export default function ProductForm({
             <img src={imageUrl} alt="" className="h-20 w-20 rounded-lg object-cover" />
           )}
           <input type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] ?? null)} className="text-sm" />
+        </div>
+      </div>
+
+      <div className="card p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold">Ficha técnica (custo dos insumos)</h3>
+          <p className="text-xs text-neutral-400 mt-0.5">
+            Selecione os insumos e a quantidade exata usada neste produto. O custo e o preço sugerido são
+            calculados automaticamente.
+          </p>
+        </div>
+
+        {ingredients.length === 0 ? (
+          <p className="text-sm text-neutral-400">
+            Nenhum insumo cadastrado ainda. Cadastre insumos em Estoque para montar a ficha técnica.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {recipe.map((r, ri) => {
+              const ing = ingredientById.get(r.ingredientId);
+              const lineCost = ing ? (Number(r.quantity) || 0) * Number(ing.cost_per_unit) : 0;
+              return (
+                <div key={ri} className="flex items-center gap-2">
+                  <select
+                    className="input flex-1"
+                    value={r.ingredientId}
+                    onChange={(e) => patchRecipeItem(ri, { ingredientId: e.target.value })}
+                  >
+                    <option value="">Selecione o insumo</option>
+                    {ingredients.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="relative">
+                    <input
+                      className="input !w-28 !pr-9"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      placeholder="Qtd."
+                      value={r.quantity}
+                      onChange={(e) => patchRecipeItem(ri, { quantity: e.target.value })}
+                    />
+                    {ing && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400">
+                        {ing.unit}
+                      </span>
+                    )}
+                  </div>
+                  <span className="w-20 shrink-0 text-right text-xs text-neutral-500">
+                    {ing ? brl(lineCost) : ''}
+                  </span>
+                  <button
+                    type="button"
+                    title="Remover insumo"
+                    className="h-9 w-9 grid place-items-center rounded-lg text-neutral-300 hover:text-red-500 shrink-0"
+                    onClick={() => setRecipe(recipe.filter((_, i) => i !== ri))}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              className="text-sm font-semibold text-brand"
+              onClick={() => setRecipe([...recipe, { ingredientId: '', quantity: '' }])}
+            >
+              + adicionar insumo
+            </button>
+          </div>
+        )}
+
+        <div className="border-t border-neutral-100 pt-3 space-y-2.5">
+          <label className="text-xs text-neutral-500 block">
+            Margem de lucro para este produto (deixe em branco para usar a padrão de {defaultMarginPercent}%)
+            <div className="relative mt-1 w-32">
+              <input
+                className="input !pr-8"
+                type="number"
+                step="0.1"
+                min="0"
+                max="95"
+                placeholder={String(defaultMarginPercent)}
+                value={marginOverride}
+                onChange={(e) => setMarginOverride(e.target.value)}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400">%</span>
+            </div>
+          </label>
+
+          <div className="bg-neutral-50 rounded-lg p-3 flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-xs text-neutral-500">Custo do produto</p>
+              <p className="font-bold">{brl(costPrice)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-neutral-500">Preço sugerido (margem {effectiveMargin}%)</p>
+              <p className="font-bold text-brand">{brl(suggestedPrice)}</p>
+            </div>
+            <button
+              type="button"
+              className="text-sm font-semibold text-brand underline underline-offset-2"
+              onClick={() => setPrice(suggestedPrice.toFixed(2))}
+              disabled={costPrice <= 0}
+            >
+              Usar preço sugerido
+            </button>
+          </div>
         </div>
       </div>
 
