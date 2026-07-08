@@ -50,7 +50,9 @@ function minutesAgo(iso: string): string {
   if (min < 1) return 'agora';
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
-  return `${h}h${min % 60 > 0 ? ` ${min % 60}m` : ''}`;
+  if (h < 48) return `${h}h${min % 60 > 0 ? ` ${min % 60}m` : ''}`;
+  const d = Math.floor(h / 24);
+  return `${d}d${h % 24 > 0 ? ` ${h % 24}h` : ''}`;
 }
 
 export default function OrdersBoard() {

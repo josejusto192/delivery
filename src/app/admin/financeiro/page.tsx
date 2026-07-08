@@ -18,7 +18,8 @@ function currentMonth() {
 
 function monthLabel(month: string) {
   const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const label = new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 export default function FinanceiroAdminPage() {
@@ -201,19 +202,19 @@ export default function FinanceiroAdminPage() {
       </div>
 
       <div className="card p-4">
-        <h3 className="font-semibold capitalize mb-3">Resultado de {monthLabel(month)}</h3>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="bg-neutral-50 rounded-lg p-3">
-            <p className="text-xs text-neutral-500">Faturamento (pedidos)</p>
-            <p className="font-bold text-lg mt-0.5">{brl(revenue ?? 0)}</p>
+        <h3 className="font-semibold mb-3">Resultado — {monthLabel(month)}</h3>
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
+          <div className="bg-neutral-50 rounded-lg py-3 px-1.5 min-w-0">
+            <p className="text-xs text-neutral-500">Faturamento</p>
+            <p className="font-bold text-[13px] sm:text-lg mt-0.5">{brl(revenue ?? 0)}</p>
           </div>
-          <div className="bg-neutral-50 rounded-lg p-3">
+          <div className="bg-neutral-50 rounded-lg py-3 px-1.5 min-w-0">
             <p className="text-xs text-neutral-500">Despesas</p>
-            <p className="font-bold text-lg mt-0.5">− {brl(totalMonth)}</p>
+            <p className="font-bold text-[13px] sm:text-lg mt-0.5">{brl(totalMonth)}</p>
           </div>
-          <div className={`rounded-lg p-3 ${result >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+          <div className={`rounded-lg py-3 px-1.5 min-w-0 ${result >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
             <p className={`text-xs ${result >= 0 ? 'text-green-700' : 'text-red-600'}`}>Resultado</p>
-            <p className={`font-bold text-lg mt-0.5 ${result >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+            <p className={`font-bold text-[13px] sm:text-lg mt-0.5 ${result >= 0 ? 'text-green-700' : 'text-red-600'}`}>
               {brl(result)}
             </p>
           </div>
@@ -315,7 +316,7 @@ export default function FinanceiroAdminPage() {
 
       <div className="card p-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="font-semibold capitalize">Contas — {monthLabel(month)}</h3>
+          <h3 className="font-semibold">Contas — {monthLabel(month)}</h3>
           {templates.some((t) => t.active) && (
             <button className="btn-brand !py-1.5 !px-3 text-sm" onClick={generateMonthly} disabled={generating}>
               {generating ? 'Gerando...' : 'Gerar contas fixas do mês'}

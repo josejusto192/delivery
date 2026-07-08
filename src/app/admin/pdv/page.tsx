@@ -197,8 +197,11 @@ export default function PdvPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">{mode === 'balcao' ? 'Caixa/PDV — Novo pedido' : 'Caixa/PDV — Mesas / Comandas'}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-bold">
+          <span className="hidden sm:inline">Caixa/PDV — </span>
+          {mode === 'balcao' ? 'Novo pedido' : 'Mesas/Comandas'}
+        </h1>
         <div className="inline-flex rounded-full border border-neutral-300 bg-white p-0.5">
           <button
             onClick={() => setMode('balcao')}
