@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { brl } from '@/lib/format';
 import type { Ingredient } from '@/lib/types';
+import InfoTip from '@/components/admin/InfoTip';
+import GuideCard from '@/components/admin/GuideCard';
 
 type Draft = {
   name: string;
@@ -34,6 +36,11 @@ export default function EstoqueAdminPage() {
   const [calcQty, setCalcQty] = useState('');
   const [launchExpense, setLaunchExpense] = useState(true);
   const [expenseLaunched, setExpenseLaunched] = useState('');
+  const [buying, setBuying] = useState<Ingredient | null>(null);
+  const [buyQty, setBuyQty] = useState('');
+  const [buyTotal, setBuyTotal] = useState('');
+  const [buyLaunch, setBuyLaunch] = useState(true);
+  const [buySaving, setBuySaving] = useState(false);
 
   const load = async () => {
     const [{ data: ing }, { data: s }] = await Promise.all([
@@ -52,13 +59,70 @@ export default function EstoqueAdminPage() {
 
   const lowStock = ingredients.filter((i) => i.active && i.min_stock > 0 && i.stock_quantity <= i.min_stock);
 
-  // compra a lançar no financeiro: insumo novo = estoque inteiro; edição = só o que aumentou
-  const editingIngredient = editingId ? ingredients.find((i) => i.id === editingId) : null;
-  const purchaseQty = Math.max(
-    0,
-    (Number(draft.stock_quantity) || 0) - (editingIngredient ? Number(editingIngredient.stock_quantity) : 0)
-  );
+  // primeira compra (insumo novo): oferece lançar no financeiro.
+  // Reposições usam o botão "Compra" na lista (custo médio ponderado).
+  const purchaseQty = editingId ? 0 : Number(draft.stock_quantity) || 0;
   const purchaseAmount = purchaseQty * (Number(draft.cost_per_unit) || 0);
+
+  // nova compra de insumo existente → soma estoque e recalcula custo médio ponderado
+  const buyQtyN = Number(buyQty) || 0;
+  const buyTotalN = Number(buyTotal) || 0;
+  const buyNewStock = buying ? Number(buying.stock_quantity) + buyQtyN : 0;
+  const buyNewAvg =
+    buying && buyNewStock > 0 && buyQtyN > 0 && buyTotalN > 0
+      ? (Number(buying.stock_quantity) * Number(buying.cost_per_unit) + buyTotalN) / buyNewStock
+      : null;
+
+  const startBuy = (i: Ingredient) => {
+    setBuying(i);
+    setBuyQty('');
+    setBuyTotal('');
+    setBuyLaunch(true);
+    setExpenseLaunched('');
+    setError('');
+  };
+
+  const cancelBuy = () => {
+    setBuying(null);
+    setBuyQty('');
+    setBuyTotal('');
+  };
+
+  const confirmBuy = async () => {
+    if (!buying || buyQtyN <= 0 || buyTotalN <= 0 || buyNewAvg == null) return;
+    setBuySaving(true);
+    const { error: e } = await supabase
+      .from('ingredients')
+      .update({
+        stock_quantity: buyNewStock,
+        cost_per_unit: Math.round(buyNewAvg * 10000) / 10000,
+      })
+      .eq('id', buying.id);
+    if (e) {
+      setBuySaving(false);
+      setError('Erro ao registrar a compra. Tente novamente.');
+      return;
+    }
+    if (buyLaunch) {
+      const now = new Date();
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      await supabase.from('expenses').insert({
+        name: `Compra de insumo — ${buying.name}`,
+        category: 'Insumos',
+        amount: Math.round(buyTotalN * 100) / 100,
+        competence_month: `${month}-01`,
+        due_date: now.toISOString().slice(0, 10),
+        paid: true,
+        paid_at: now.toISOString(),
+      });
+    }
+    setExpenseLaunched(
+      `Compra registrada: +${buyQtyN.toLocaleString('pt-BR')} ${unitLabel(buying.unit)} de ${buying.name}, novo custo médio ${brl(buyNewAvg)}/${unitLabel(buying.unit)}${buyLaunch ? `, ${brl(buyTotalN)} lançados no Financeiro` : ''}.`
+    );
+    setBuySaving(false);
+    cancelBuy();
+    await load();
+  };
 
   const calcResult = useMemo(() => {
     const total = Number(calcTotal);
@@ -167,6 +231,17 @@ export default function EstoqueAdminPage() {
     <div className="max-w-3xl space-y-4">
       <h1 className="text-xl font-bold">Estoque de insumos</h1>
 
+      <GuideCard
+        id="estoque"
+        title="Como funciona o estoque"
+        steps={[
+          'Cadastre cada insumo que você compra (carne, pão, molhos...) com o valor pago por kg ou por unidade.',
+          'Em Cardápio → Produtos, monte a ficha técnica de cada item: quanto de cada insumo ele usa. O custo e o preço sugerido são calculados na hora.',
+          'Quando um pedido é confirmado, o estoque dos insumos baixa sozinho (e volta se o pedido for cancelado).',
+          'Comprou mais? Use o botão "+ Compra" no insumo: soma ao estoque, recalcula o custo médio e lança a despesa no Financeiro automaticamente.',
+        ]}
+      />
+
       {lowStock.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm">
           <p className="font-semibold text-amber-800">
@@ -200,7 +275,8 @@ export default function EstoqueAdminPage() {
           </label>
           <div>
             <label className="text-xs text-neutral-500 block">
-              Valor pago por {unitLabel(draft.unit)} (R$)
+              Valor pago por {unitLabel(draft.unit)} (R$){' '}
+              <InfoTip text="É o que VOCÊ paga ao fornecedor, não o preço de venda. É a base do cálculo de custo dos produtos do cardápio." />
               <input
                 className="input mt-1"
                 type="number"
@@ -262,7 +338,8 @@ export default function EstoqueAdminPage() {
             />
           </label>
           <label className="text-xs text-neutral-500">
-            Estoque mínimo ({unitLabel(draft.unit)}) — avisa quando chegar neste nível
+            Estoque mínimo ({unitLabel(draft.unit)}){' '}
+            <InfoTip text="Quando o estoque chegar neste nível, o insumo aparece com alerta de 'baixo' no topo desta tela. Deixe 0 para não avisar." />
             <input
               className="input mt-1"
               type="number"
@@ -273,6 +350,13 @@ export default function EstoqueAdminPage() {
             />
           </label>
         </div>
+        {editingId && (
+          <p className="text-xs text-neutral-400 bg-neutral-50 rounded-lg p-2.5">
+            💡 Editar é para <strong>correções</strong> (não lança despesa). Comprou mais deste insumo? Use o
+            botão <strong>+ Compra</strong> na lista — ele soma ao estoque, recalcula o custo médio e lança no
+            Financeiro.
+          </p>
+        )}
         {purchaseAmount > 0 && (
           <label className="flex items-start gap-2 text-sm bg-neutral-50 rounded-lg p-3 cursor-pointer">
             <input
@@ -308,32 +392,108 @@ export default function EstoqueAdminPage() {
         <div className="card divide-y divide-neutral-100">
           {ingredients.map((i) => {
             const low = i.active && i.stock_quantity <= i.min_stock && i.min_stock > 0;
+            const isBuying = buying?.id === i.id;
             return (
-              <div key={i.id} className="p-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className={`font-medium truncate ${!i.active ? 'text-neutral-400 line-through' : ''}`}>
-                    {i.name}
-                  </p>
-                  <p className="text-sm text-neutral-500">
-                    {brl(Number(i.cost_per_unit))} / {unitLabel(i.unit)} · Estoque: {Number(i.stock_quantity).toLocaleString('pt-BR')}{' '}
-                    {unitLabel(i.unit)}
-                    {low && <span className="text-amber-600 font-semibold ml-1">· baixo</span>}
-                  </p>
+              <div key={i.id}>
+                <div className="p-3 flex items-center gap-3 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium truncate ${!i.active ? 'text-neutral-400 line-through' : ''}`}>
+                      {i.name}
+                    </p>
+                    <p className="text-sm text-neutral-500">
+                      {brl(Number(i.cost_per_unit))} / {unitLabel(i.unit)} · Estoque: {Number(i.stock_quantity).toLocaleString('pt-BR')}{' '}
+                      {unitLabel(i.unit)}
+                      {low && <span className="text-amber-600 font-semibold ml-1">· baixo</span>}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => (isBuying ? cancelBuy() : startBuy(i))}
+                    className="text-xs font-semibold rounded-full px-3 py-1 shrink-0 bg-brand/10 text-brand hover:bg-brand/20"
+                  >
+                    + Compra
+                  </button>
+                  <button
+                    onClick={() => toggleActive(i)}
+                    className={`text-xs font-semibold rounded-full px-3 py-1 shrink-0 ${
+                      i.active ? 'bg-green-100 text-green-700' : 'bg-neutral-200 text-neutral-500'
+                    }`}
+                  >
+                    {i.active ? 'Ativo' : 'Pausado'}
+                  </button>
+                  <button onClick={() => startEdit(i)} className="text-sm font-semibold text-brand px-2 shrink-0">
+                    Editar
+                  </button>
+                  <button onClick={() => remove(i)} className="text-xs text-neutral-400 hover:text-red-500 shrink-0">
+                    Excluir
+                  </button>
                 </div>
-                <button
-                  onClick={() => toggleActive(i)}
-                  className={`text-xs font-semibold rounded-full px-3 py-1 shrink-0 ${
-                    i.active ? 'bg-green-100 text-green-700' : 'bg-neutral-200 text-neutral-500'
-                  }`}
-                >
-                  {i.active ? 'Ativo' : 'Pausado'}
-                </button>
-                <button onClick={() => startEdit(i)} className="text-sm font-semibold text-brand px-2 shrink-0">
-                  Editar
-                </button>
-                <button onClick={() => remove(i)} className="text-xs text-neutral-400 hover:text-red-500 shrink-0">
-                  Excluir
-                </button>
+
+                {isBuying && (
+                  <div className="mx-3 mb-3 bg-neutral-50 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+                      Registrar compra de {i.name}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="text-xs text-neutral-500">
+                        Quantidade comprada ({unitLabel(i.unit)})
+                        <input
+                          className="input mt-1"
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          placeholder="0"
+                          value={buyQty}
+                          onChange={(e) => setBuyQty(e.target.value)}
+                        />
+                      </label>
+                      <label className="text-xs text-neutral-500">
+                        Total pago (R$)
+                        <input
+                          className="input mt-1"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0,00"
+                          value={buyTotal}
+                          onChange={(e) => setBuyTotal(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    {buyNewAvg != null && (
+                      <div className="text-sm bg-white rounded-lg p-2.5 border border-neutral-200">
+                        <p>
+                          Estoque: {Number(i.stock_quantity).toLocaleString('pt-BR')} →{' '}
+                          <strong>{buyNewStock.toLocaleString('pt-BR')} {unitLabel(i.unit)}</strong>
+                          {' '}· Custo médio: {brl(Number(i.cost_per_unit))} →{' '}
+                          <strong>{brl(buyNewAvg)}/{unitLabel(i.unit)}</strong>
+                        </p>
+                        <p className="text-xs text-neutral-400 mt-0.5">
+                          O custo médio pondera o estoque atual com esta compra — os preços sugeridos do cardápio
+                          acompanham automaticamente.
+                        </p>
+                      </div>
+                    )}
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={buyLaunch} onChange={(e) => setBuyLaunch(e.target.checked)} />
+                      Lançar {buyTotalN > 0 ? brl(buyTotalN) : 'a compra'} no Financeiro (categoria Insumos)
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        className="border border-neutral-300 rounded-lg px-4 py-2 text-sm font-semibold bg-white"
+                        onClick={cancelBuy}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        className="btn-brand !py-2"
+                        onClick={confirmBuy}
+                        disabled={buySaving || buyNewAvg == null}
+                      >
+                        {buySaving ? 'Registrando...' : 'Registrar compra'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -346,7 +506,10 @@ export default function EstoqueAdminPage() {
       )}
 
       <div className="card p-4 space-y-2">
-        <h3 className="font-semibold">Margem de lucro padrão</h3>
+        <h3 className="font-semibold">
+          Margem de lucro padrão{' '}
+          <InfoTip text="Margem de 30% significa que 30% do preço de venda é lucro bruto. Ex.: custo R$ 7,00 com margem 30% → preço sugerido R$ 10,00." />
+        </h3>
         <p className="text-xs text-neutral-400">
           Usada para sugerir o preço de venda de cada produto do cardápio a partir do custo dos insumos.
           Pode ser sobrescrita individualmente em cada produto.

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { brl } from '@/lib/format';
 import type { Category, Ingredient, Product } from '@/lib/types';
+import InfoTip from '@/components/admin/InfoTip';
 
 type DraftAddon = { name: string; price: string };
 type DraftGroup = { name: string; min: string; max: string; addons: DraftAddon[] };
@@ -228,10 +229,13 @@ export default function ProductForm({
 
       <div className="card p-4 space-y-3">
         <div>
-          <h3 className="font-semibold">Ficha técnica (custo dos insumos)</h3>
+          <h3 className="font-semibold">
+            Ficha técnica (custo dos insumos){' '}
+            <InfoTip text="É a receita do produto: quanto de cada insumo ele consome. Com ela o sistema calcula o custo exato, sugere o preço de venda e baixa o estoque a cada venda." />
+          </h3>
           <p className="text-xs text-neutral-400 mt-0.5">
-            Selecione os insumos e a quantidade exata usada neste produto. O custo e o preço sugerido são
-            calculados automaticamente.
+            Selecione os insumos e a quantidade exata usada neste produto. Para insumos em kg, use decimais:
+            150 g = <strong>0,150</strong>. O custo e o preço sugerido são calculados automaticamente.
           </p>
         </div>
 
@@ -313,7 +317,8 @@ export default function ProductForm({
 
         <div className="border-t border-neutral-100 pt-3 space-y-2.5">
           <label className="text-xs text-neutral-500 block">
-            Margem de lucro para este produto (deixe em branco para usar a padrão de {defaultMarginPercent}%)
+            Margem de lucro para este produto (deixe em branco para usar a padrão de {defaultMarginPercent}%){' '}
+            <InfoTip text="Margem é a fatia do preço que sobra depois do custo dos insumos. Ex.: custo R$ 7,00 com margem 30% → preço sugerido R$ 10,00. A margem padrão você configura na aba Estoque." />
             <div className="relative mt-1 w-32">
               <input
                 className="input !pr-8"

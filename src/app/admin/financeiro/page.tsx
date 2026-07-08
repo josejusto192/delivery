@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { brl } from '@/lib/format';
 import type { Expense, ExpenseTemplate } from '@/lib/types';
+import InfoTip from '@/components/admin/InfoTip';
+import GuideCard from '@/components/admin/GuideCard';
 
 type TemplateDraft = { name: string; category: string; amount: string; day_of_month: string };
 type ExpenseDraft = { name: string; category: string; amount: string; due_date: string };
@@ -219,14 +221,29 @@ export default function FinanceiroAdminPage() {
         <input
           type="month"
           className="input !w-auto !py-1.5"
+          title="Escolha o mês para ver contas e resultado"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
         />
       </div>
 
+      <GuideCard
+        id="financeiro"
+        title="Como funciona o financeiro"
+        steps={[
+          'O Resultado do mês compara o faturamento dos pedidos com as despesas lançadas: verde é lucro, vermelho é prejuízo.',
+          'Lance as contas do mês (água, luz, gás...) e clique no selo Pago/Pendente para marcar quando pagar. Contas vencidas ficam em vermelho.',
+          'Custos que se repetem todo mês (aluguel, internet...) você cadastra uma vez em Custos fixos e gera as contas do mês com um clique — sem duplicar.',
+          'Compras de insumos entram aqui sozinhas quando você registra a compra na aba Estoque (categoria Insumos).',
+        ]}
+      />
+
       {/* 1. resumo do mês */}
       <div className="card p-4">
-        <h3 className="font-semibold mb-3">Resultado — {monthLabel(month)}</h3>
+        <h3 className="font-semibold mb-3">
+          Resultado — {monthLabel(month)}{' '}
+          <InfoTip text="Faturamento (pedidos não cancelados do mês) menos despesas (pagas e pendentes). O custo dos insumos entra pelas compras lançadas, não pela ficha técnica." />
+        </h3>
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
           <div className="bg-neutral-50 rounded-lg py-3 px-1.5 min-w-0">
             <p className="text-xs text-neutral-500">Faturamento</p>
@@ -245,10 +262,6 @@ export default function FinanceiroAdminPage() {
             </p>
           </div>
         </div>
-        <p className="text-xs text-neutral-400 mt-2">
-          Faturamento = pedidos não cancelados do mês. Despesas = contas pagas e pendentes deste mês
-          (incluindo compras de insumos lançadas pelo Estoque).
-        </p>
       </div>
 
       {/* 2. contas do mês — uso diário */}

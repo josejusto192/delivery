@@ -111,7 +111,12 @@ export default function ProductsAdminPage() {
       ) : (
         <div className="card divide-y divide-neutral-100">
           {visible.map((p) => {
-            const cost = Number(p.cost_price) || 0;
+            // custo ao vivo pela ficha técnica — acompanha o custo médio atual dos insumos
+            const liveCost = (p.product_ingredients ?? []).reduce(
+              (s, pi) => s + (pi.ingredient ? Number(pi.quantity) * Number(pi.ingredient.cost_per_unit) : 0),
+              0
+            );
+            const cost = liveCost > 0 ? liveCost : Number(p.cost_price) || 0;
             const price = Number(p.price);
             const belowCost = cost > 0 && price < cost;
             const marginReal = cost > 0 && price > 0 ? ((price - cost) / price) * 100 : null;
