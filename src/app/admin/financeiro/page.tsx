@@ -11,6 +11,21 @@ type ExpenseDraft = { name: string; category: string; amount: string; due_date: 
 const emptyTemplateDraft: TemplateDraft = { name: '', category: '', amount: '', day_of_month: '5' };
 const emptyExpenseDraft: ExpenseDraft = { name: '', category: '', amount: '', due_date: '' };
 
+const CATEGORY_SUGGESTIONS = [
+  'Insumos',
+  'Aluguel',
+  'Energia',
+  'Água',
+  'Internet',
+  'Gás',
+  'Funcionários',
+  'Embalagens',
+  'Marketing',
+  'Impostos',
+  'Manutenção',
+  'Outros',
+];
+
 function currentMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -189,8 +204,16 @@ export default function FinanceiroAdminPage() {
     );
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="max-w-3xl space-y-4">
+      <datalist id="categorias-sugeridas">
+        {CATEGORY_SUGGESTIONS.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-bold mr-auto">Financeiro</h1>
         <input
@@ -201,6 +224,7 @@ export default function FinanceiroAdminPage() {
         />
       </div>
 
+      {/* 1. resumo do mês */}
       <div className="card p-4">
         <h3 className="font-semibold mb-3">Resultado — {monthLabel(month)}</h3>
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
@@ -213,77 +237,138 @@ export default function FinanceiroAdminPage() {
             <p className="font-bold text-[13px] sm:text-lg mt-0.5">{brl(totalMonth)}</p>
           </div>
           <div className={`rounded-lg py-3 px-1.5 min-w-0 ${result >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-            <p className={`text-xs ${result >= 0 ? 'text-green-700' : 'text-red-600'}`}>Resultado</p>
+            <p className={`text-xs ${result >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+              {result >= 0 ? 'Lucro' : 'Prejuízo'}
+            </p>
             <p className={`font-bold text-[13px] sm:text-lg mt-0.5 ${result >= 0 ? 'text-green-700' : 'text-red-600'}`}>
               {brl(result)}
             </p>
           </div>
         </div>
         <p className="text-xs text-neutral-400 mt-2">
-          O faturamento considera todos os pedidos não cancelados do mês. As despesas incluem contas pagas e pendentes.
-          O custo dos insumos não entra aqui — ele já está embutido no preço de cada produto.
+          Faturamento = pedidos não cancelados do mês. Despesas = contas pagas e pendentes deste mês
+          (incluindo compras de insumos lançadas pelo Estoque).
         </p>
       </div>
 
+      {/* 2. contas do mês — uso diário */}
       <div className="card p-4 space-y-3">
-        <div>
-          <h3 className="font-semibold">Custos fixos (recorrentes)</h3>
-          <p className="text-xs text-neutral-400 mt-0.5">
-            Ex.: aluguel, internet, softwares. Cadastre uma vez e gere a conta do mês no quadro abaixo.
-          </p>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h3 className="font-semibold">Contas de {monthLabel(month)}</h3>
+          <div className="flex gap-3 text-sm">
+            <span className="text-green-700">
+              Pago <strong>{brl(totalPaid)}</strong>
+            </span>
+            <span className="text-amber-700">
+              Pendente <strong>{brl(totalPending)}</strong>
+            </span>
+          </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-3">
-          <input
-            className="input sm:col-span-2"
-            placeholder="Nome — ex.: Aluguel"
-            value={templateDraft.name}
-            onChange={(e) => setTemplateDraft({ ...templateDraft, name: e.target.value })}
-          />
-          <input
-            className="input"
-            placeholder="Categoria — ex.: Ocupação"
-            value={templateDraft.category}
-            onChange={(e) => setTemplateDraft({ ...templateDraft, category: e.target.value })}
-          />
-          <label className="text-xs text-neutral-500">
-            Valor mensal (R$)
+        <div className="bg-neutral-50 rounded-xl p-3 space-y-2">
+          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Lançar conta</p>
+          <div className="grid grid-cols-2 sm:grid-cols-[1fr_10rem] gap-2">
             <input
-              className="input mt-1"
-              type="number"
-              step="0.01"
-              min="0"
-              value={templateDraft.amount}
-              onChange={(e) => setTemplateDraft({ ...templateDraft, amount: e.target.value })}
+              className="input col-span-2 sm:col-span-1"
+              placeholder="Nome — ex.: Conta de luz"
+              value={expenseDraft.name}
+              onChange={(e) => setExpenseDraft({ ...expenseDraft, name: e.target.value })}
             />
-          </label>
-          <label className="text-xs text-neutral-500">
-            Dia de vencimento
             <input
-              className="input mt-1"
-              type="number"
-              min="1"
-              max="28"
-              value={templateDraft.day_of_month}
-              onChange={(e) => setTemplateDraft({ ...templateDraft, day_of_month: e.target.value })}
+              className="input col-span-2 sm:col-span-1"
+              placeholder="Categoria"
+              list="categorias-sugeridas"
+              value={expenseDraft.category}
+              onChange={(e) => setExpenseDraft({ ...expenseDraft, category: e.target.value })}
             />
-          </label>
-        </div>
-        <div className="flex gap-2">
-          {editingTemplateId && (
-            <button
-              className="border border-neutral-300 rounded-lg px-4 py-2 text-sm font-semibold bg-white"
-              onClick={cancelTemplateEdit}
-            >
-              Cancelar
-            </button>
-          )}
-          <button className="btn-brand !py-2" onClick={saveTemplate}>
-            {editingTemplateId ? 'Salvar alterações' : '+ Adicionar custo fixo'}
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400">R$</span>
+              <input
+                className="input !pl-9"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0,00"
+                value={expenseDraft.amount}
+                onChange={(e) => setExpenseDraft({ ...expenseDraft, amount: e.target.value })}
+              />
+            </div>
+            <input
+              className="input"
+              type="date"
+              title="Data de vencimento"
+              value={expenseDraft.due_date}
+              onChange={(e) => setExpenseDraft({ ...expenseDraft, due_date: e.target.value })}
+            />
+          </div>
+          <button className="btn-brand !py-2 w-full sm:w-auto" onClick={addExpense}>
+            + Lançar conta
           </button>
         </div>
 
-        <div className="divide-y divide-neutral-100 border-t border-neutral-100">
+        {error && <p className="text-sm text-red-500">{error}</p>}
+
+        <div className="divide-y divide-neutral-100">
+          {expenses.map((exp) => {
+            const overdue = !exp.paid && exp.due_date != null && exp.due_date < today;
+            return (
+              <div key={exp.id} className="py-2.5 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className={`font-medium truncate ${exp.paid ? 'text-neutral-400' : ''}`}>{exp.name}</p>
+                  <p className="text-sm text-neutral-500">
+                    {brl(Number(exp.amount))} · {exp.category}
+                    {exp.due_date && (
+                      <span className={overdue ? 'text-red-500 font-semibold' : ''}>
+                        {' '}· {overdue ? 'venceu' : 'vence'}{' '}
+                        {new Date(`${exp.due_date}T00:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => togglePaid(exp)}
+                  title="Clique para alternar entre pago e pendente"
+                  className={`text-xs font-semibold rounded-full px-3 py-1 shrink-0 ${
+                    exp.paid
+                      ? 'bg-green-100 text-green-700'
+                      : overdue
+                        ? 'bg-red-100 text-red-600'
+                        : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  {exp.paid ? 'Pago ✓' : overdue ? 'Vencida' : 'Pendente'}
+                </button>
+                <button onClick={() => removeExpense(exp)} className="text-xs text-neutral-400 hover:text-red-500 shrink-0">
+                  Excluir
+                </button>
+              </div>
+            );
+          })}
+          {expenses.length === 0 && (
+            <p className="py-3 text-sm text-neutral-500">
+              Nenhuma conta lançada neste mês. Lance acima ou gere as contas fixas abaixo.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* 3. custos fixos — configuração */}
+      <div className="card p-4 space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="font-semibold">Custos fixos (todo mês)</h3>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Aluguel, internet, softwares... Cadastre uma vez e gere as contas do mês com um clique.
+            </p>
+          </div>
+          {templates.some((t) => t.active) && (
+            <button className="btn-brand !py-1.5 !px-3 text-sm" onClick={generateMonthly} disabled={generating}>
+              {generating ? 'Gerando...' : `Gerar contas de ${monthLabel(month).split(' ')[0]}`}
+            </button>
+          )}
+        </div>
+
+        <div className="divide-y divide-neutral-100">
           {templates.map((t) => (
             <div key={t.id} className="py-2.5 flex items-center gap-3">
               <div className="flex-1 min-w-0">
@@ -296,106 +381,78 @@ export default function FinanceiroAdminPage() {
               </div>
               <button
                 onClick={() => toggleTemplateActive(t)}
-                className={`text-xs font-semibold rounded-full px-3 py-1 ${
+                className={`text-xs font-semibold rounded-full px-3 py-1 shrink-0 ${
                   t.active ? 'bg-green-100 text-green-700' : 'bg-neutral-200 text-neutral-500'
                 }`}
               >
                 {t.active ? 'Ativo' : 'Pausado'}
               </button>
-              <button onClick={() => startEditTemplate(t)} className="text-sm font-semibold text-brand px-2">
+              <button onClick={() => startEditTemplate(t)} className="text-sm font-semibold text-brand px-2 shrink-0">
                 Editar
               </button>
-              <button onClick={() => removeTemplate(t)} className="text-xs text-neutral-400 hover:text-red-500">
+              <button onClick={() => removeTemplate(t)} className="text-xs text-neutral-400 hover:text-red-500 shrink-0">
                 Excluir
               </button>
             </div>
           ))}
           {templates.length === 0 && <p className="py-3 text-sm text-neutral-500">Nenhum custo fixo cadastrado.</p>}
         </div>
-      </div>
 
-      <div className="card p-4 space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <h3 className="font-semibold">Contas — {monthLabel(month)}</h3>
-          {templates.some((t) => t.active) && (
-            <button className="btn-brand !py-1.5 !px-3 text-sm" onClick={generateMonthly} disabled={generating}>
-              {generating ? 'Gerando...' : 'Gerar contas fixas do mês'}
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-center">
-          <div className="bg-green-50 rounded-lg p-2.5">
-            <p className="text-xs text-green-700">Pago</p>
-            <p className="font-bold text-green-700">{brl(totalPaid)}</p>
-          </div>
-          <div className="bg-amber-50 rounded-lg p-2.5">
-            <p className="text-xs text-amber-700">Pendente</p>
-            <p className="font-bold text-amber-700">{brl(totalPending)}</p>
-          </div>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-2 border-t border-neutral-100 pt-3">
-          <input
-            className="input sm:col-span-2"
-            placeholder="Lançar conta avulsa — ex.: Água, Luz"
-            value={expenseDraft.name}
-            onChange={(e) => setExpenseDraft({ ...expenseDraft, name: e.target.value })}
-          />
-          <input
-            className="input"
-            placeholder="Categoria"
-            value={expenseDraft.category}
-            onChange={(e) => setExpenseDraft({ ...expenseDraft, category: e.target.value })}
-          />
-          <div className="flex gap-2">
+        <div className="bg-neutral-50 rounded-xl p-3 space-y-2">
+          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
+            {editingTemplateId ? 'Editar custo fixo' : 'Novo custo fixo'}
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-[1fr_10rem] gap-2">
             <input
-              className="input"
-              type="number"
-              step="0.01"
-              min="0"
-              placeholder="Valor (R$)"
-              value={expenseDraft.amount}
-              onChange={(e) => setExpenseDraft({ ...expenseDraft, amount: e.target.value })}
+              className="input col-span-2 sm:col-span-1"
+              placeholder="Nome — ex.: Aluguel"
+              value={templateDraft.name}
+              onChange={(e) => setTemplateDraft({ ...templateDraft, name: e.target.value })}
             />
             <input
-              className="input"
-              type="date"
-              value={expenseDraft.due_date}
-              onChange={(e) => setExpenseDraft({ ...expenseDraft, due_date: e.target.value })}
+              className="input col-span-2 sm:col-span-1"
+              placeholder="Categoria"
+              list="categorias-sugeridas"
+              value={templateDraft.category}
+              onChange={(e) => setTemplateDraft({ ...templateDraft, category: e.target.value })}
             />
-          </div>
-          <button className="btn-brand !py-2 sm:col-span-2" onClick={addExpense}>
-            + Lançar conta
-          </button>
-        </div>
-
-        {error && <p className="text-sm text-red-500">{error}</p>}
-
-        <div className="divide-y divide-neutral-100">
-          {expenses.map((exp) => (
-            <div key={exp.id} className="py-2.5 flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className={`font-medium truncate ${exp.paid ? 'text-neutral-400' : ''}`}>{exp.name}</p>
-                <p className="text-sm text-neutral-500">
-                  {brl(Number(exp.amount))} · {exp.category}
-                  {exp.due_date && ` · vence ${new Date(`${exp.due_date}T00:00:00`).toLocaleDateString('pt-BR')}`}
-                </p>
-              </div>
-              <button
-                onClick={() => togglePaid(exp)}
-                className={`text-xs font-semibold rounded-full px-3 py-1 ${
-                  exp.paid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                }`}
-              >
-                {exp.paid ? 'Pago' : 'Pendente'}
-              </button>
-              <button onClick={() => removeExpense(exp)} className="text-xs text-neutral-400 hover:text-red-500">
-                Excluir
-              </button>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400">R$</span>
+              <input
+                className="input !pl-9"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0,00 por mês"
+                value={templateDraft.amount}
+                onChange={(e) => setTemplateDraft({ ...templateDraft, amount: e.target.value })}
+              />
             </div>
-          ))}
-          {expenses.length === 0 && <p className="py-3 text-sm text-neutral-500">Nenhuma conta lançada neste mês.</p>}
+            <label className="text-xs text-neutral-500 flex items-center gap-2">
+              Vence dia
+              <input
+                className="input !w-20"
+                type="number"
+                min="1"
+                max="28"
+                value={templateDraft.day_of_month}
+                onChange={(e) => setTemplateDraft({ ...templateDraft, day_of_month: e.target.value })}
+              />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            {editingTemplateId && (
+              <button
+                className="border border-neutral-300 rounded-lg px-4 py-2 text-sm font-semibold bg-white"
+                onClick={cancelTemplateEdit}
+              >
+                Cancelar
+              </button>
+            )}
+            <button className="btn-brand !py-2" onClick={saveTemplate}>
+              {editingTemplateId ? 'Salvar alterações' : '+ Adicionar custo fixo'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

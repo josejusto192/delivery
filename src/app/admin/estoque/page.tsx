@@ -32,6 +32,8 @@ export default function EstoqueAdminPage() {
   const [showCalc, setShowCalc] = useState(false);
   const [calcTotal, setCalcTotal] = useState('');
   const [calcQty, setCalcQty] = useState('');
+  const [launchExpense, setLaunchExpense] = useState(true);
+  const [expenseLaunched, setExpenseLaunched] = useState('');
 
   const load = async () => {
     const [{ data: ing }, { data: s }] = await Promise.all([
@@ -50,6 +52,14 @@ export default function EstoqueAdminPage() {
 
   const lowStock = ingredients.filter((i) => i.active && i.min_stock > 0 && i.stock_quantity <= i.min_stock);
 
+  // compra a lançar no financeiro: insumo novo = estoque inteiro; edição = só o que aumentou
+  const editingIngredient = editingId ? ingredients.find((i) => i.id === editingId) : null;
+  const purchaseQty = Math.max(
+    0,
+    (Number(draft.stock_quantity) || 0) - (editingIngredient ? Number(editingIngredient.stock_quantity) : 0)
+  );
+  const purchaseAmount = purchaseQty * (Number(draft.cost_per_unit) || 0);
+
   const calcResult = useMemo(() => {
     const total = Number(calcTotal);
     const qty = Number(calcQty);
@@ -67,6 +77,7 @@ export default function EstoqueAdminPage() {
 
   const startEdit = (i: Ingredient) => {
     setEditingId(i.id);
+    setExpenseLaunched('');
     setDraft({
       name: i.name,
       unit: i.unit,
@@ -80,16 +91,19 @@ export default function EstoqueAdminPage() {
   const cancelEdit = () => {
     setEditingId(null);
     setDraft(emptyDraft);
+    setLaunchExpense(true);
     setError('');
   };
 
   const save = async () => {
     setError('');
+    setExpenseLaunched('');
     if (!draft.name.trim()) return setError('Informe o nome do insumo.');
     if (!draft.cost_per_unit || Number(draft.cost_per_unit) <= 0)
       return setError(`Informe o valor pago por ${unitLabel(draft.unit)}.`);
+    const name = draft.name.trim();
     const payload = {
-      name: draft.name.trim(),
+      name,
       unit: draft.unit,
       cost_per_unit: Number(draft.cost_per_unit) || 0,
       stock_quantity: Number(draft.stock_quantity) || 0,
@@ -102,6 +116,27 @@ export default function EstoqueAdminPage() {
       setError('Erro ao salvar. Tente novamente.');
       return;
     }
+
+    // lança a compra como despesa do mês no Financeiro (categoria Insumos)
+    if (launchExpense && purchaseAmount > 0) {
+      const now = new Date();
+      const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const { error: expErr } = await supabase.from('expenses').insert({
+        name: `Compra de insumo — ${name}`,
+        category: 'Insumos',
+        amount: Math.round(purchaseAmount * 100) / 100,
+        competence_month: `${month}-01`,
+        due_date: now.toISOString().slice(0, 10),
+        paid: true,
+        paid_at: now.toISOString(),
+      });
+      if (!expErr) {
+        setExpenseLaunched(
+          `Compra de ${brl(purchaseAmount)} lançada no Financeiro (categoria Insumos).`
+        );
+      }
+    }
+
     cancelEdit();
     await load();
   };
@@ -238,6 +273,21 @@ export default function EstoqueAdminPage() {
             />
           </label>
         </div>
+        {purchaseAmount > 0 && (
+          <label className="flex items-start gap-2 text-sm bg-neutral-50 rounded-lg p-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={launchExpense}
+              onChange={(e) => setLaunchExpense(e.target.checked)}
+            />
+            <span>
+              Lançar esta compra no <strong>Financeiro</strong>: {brl(purchaseAmount)} na categoria
+              &quot;Insumos&quot; ({purchaseQty.toLocaleString('pt-BR')} {unitLabel(draft.unit)} ×{' '}
+              {brl(Number(draft.cost_per_unit) || 0)})
+            </span>
+          </label>
+        )}
         {error && <p className="text-sm text-red-500">{error}</p>}
         <div className="flex gap-2">
           {editingId && (
@@ -249,6 +299,7 @@ export default function EstoqueAdminPage() {
             {editingId ? 'Salvar alterações' : '+ Adicionar insumo'}
           </button>
         </div>
+        {expenseLaunched && <p className="text-sm text-green-600">{expenseLaunched} ✓</p>}
       </div>
 
       {loading ? (

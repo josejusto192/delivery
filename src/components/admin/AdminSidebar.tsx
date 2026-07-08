@@ -120,7 +120,7 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
       <div className="px-4 pt-5 pb-3">
         <p className="text-white font-bold text-sm uppercase tracking-wider">Painel da loja</p>
       </div>
-      <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto pb-4">
+      <nav className="nav-scroll flex-1 px-2 space-y-0.5 overflow-y-auto pb-4">
         {ITEMS.map((item) => (
           <NavLink key={item.label} item={item} pathname={pathname} onNavigate={onNavigate} />
         ))}

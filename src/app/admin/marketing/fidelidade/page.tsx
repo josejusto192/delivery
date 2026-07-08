@@ -159,10 +159,10 @@ export default function LoyaltyAdminPage() {
         <div className="divide-y divide-neutral-100 max-h-72 overflow-y-auto">
           {products.map((p) => (
             <div key={p.id} className="flex items-center gap-3 py-2">
-              <span className="flex-1 text-sm">{p.name}</span>
-              <span className="text-xs text-neutral-400">{brl(Number(p.promo_price ?? p.price))}</span>
+              <span className="flex-1 min-w-0 text-sm truncate">{p.name}</span>
+              <span className="text-xs text-neutral-400 shrink-0">{brl(Number(p.promo_price ?? p.price))}</span>
               <input
-                className="input w-24 !py-1"
+                className="input !w-24 !py-1 shrink-0"
                 type="number"
                 step="0.01"
                 placeholder="auto"
