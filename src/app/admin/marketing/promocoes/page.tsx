@@ -300,9 +300,12 @@ export default function PromotionsAdminPage() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <button className="btn-brand" onClick={startNew}>
-        + Nova promoção
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-xl font-bold mr-auto">Promoções</h1>
+        <button className="btn-brand !py-2" onClick={startNew}>
+          + Nova promoção
+        </button>
+      </div>
 
       <div className="card divide-y divide-neutral-100">
         {promotions.map((p) => (

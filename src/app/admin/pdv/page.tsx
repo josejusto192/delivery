@@ -218,7 +218,7 @@ export default function PdvPage() {
       {mode === 'mesas' ? (
         <TablesBoard products={products} categories={categories} />
       ) : (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pb-20 lg:pb-0">
         {/* produtos */}
         <div className="lg:col-span-2 space-y-3">
           <input className="input" placeholder="Buscar produto..." value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -274,7 +274,7 @@ export default function PdvPage() {
         </div>
 
         {/* carrinho / dados do pedido */}
-        <div className="space-y-3">
+        <div id="pdv-carrinho" className="space-y-3 scroll-mt-4">
           <div className="card p-3 space-y-2">
             <h2 className="font-semibold text-sm">Itens</h2>
             {cart.length === 0 && <p className="text-sm text-neutral-400">Nenhum item adicionado.</p>}
@@ -421,6 +421,19 @@ export default function PdvPage() {
             setModalProduct(null);
           }}
         />
+      )}
+
+      {/* barra fixa do carrinho no mobile — o resumo fica fora da tela ao adicionar itens */}
+      {mode === 'balcao' && cart.length > 0 && (
+        <button
+          className="lg:hidden fixed bottom-4 left-4 right-4 z-40 bg-brand text-white rounded-xl px-4 py-3 font-semibold shadow-lg flex items-center justify-between"
+          onClick={() => document.getElementById('pdv-carrinho')?.scrollIntoView({ behavior: 'smooth' })}
+        >
+          <span>
+            🛒 {cart.reduce((s, i) => s + i.quantity, 0)} {cart.reduce((s, i) => s + i.quantity, 0) === 1 ? 'item' : 'itens'}
+          </span>
+          <span>Ver pedido · {brl(total)}</span>
+        </button>
       )}
     </div>
   );

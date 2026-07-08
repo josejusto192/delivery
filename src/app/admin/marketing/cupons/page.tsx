@@ -34,6 +34,7 @@ const EMPTY_FORM: FormState = {
 export default function CouponsAdminPage() {
   const supabase = useMemo(() => createClient(), []);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +42,7 @@ export default function CouponsAdminPage() {
   const load = async () => {
     const { data } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
     setCoupons(data ?? []);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -86,6 +88,7 @@ export default function CouponsAdminPage() {
 
   return (
     <div className="max-w-2xl space-y-4">
+      <h1 className="text-xl font-bold">Cupons de desconto</h1>
       <div className="card p-4 space-y-3">
         <h3 className="font-semibold">Novo cupom</h3>
         <div className="grid grid-cols-2 gap-2">
@@ -155,6 +158,9 @@ export default function CouponsAdminPage() {
         </button>
       </div>
 
+      {loading ? (
+        <p className="text-neutral-400 py-8 text-center">Carregando...</p>
+      ) : (
       <div className="card divide-y divide-neutral-100">
         {coupons.map((c) => (
           <div key={c.id} className="p-3 flex items-center gap-3">
@@ -184,6 +190,7 @@ export default function CouponsAdminPage() {
         ))}
         {coupons.length === 0 && <p className="p-4 text-sm text-neutral-500">Nenhum cupom criado ainda.</p>}
       </div>
+      )}
     </div>
   );
 }

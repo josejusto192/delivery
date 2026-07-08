@@ -7,11 +7,13 @@ import type { Category } from '@/lib/types';
 export default function CategoriesAdminPage() {
   const supabase = useMemo(() => createClient(), []);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState('');
 
   const load = async () => {
     const { data } = await supabase.from('categories').select('*').order('sort_order');
     setCategories(data ?? []);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -30,7 +32,9 @@ export default function CategoriesAdminPage() {
   };
 
   const rename = async (id: string, name: string) => {
-    await supabase.from('categories').update({ name }).eq('id', id);
+    if (!name.trim()) return load();
+    await supabase.from('categories').update({ name: name.trim() }).eq('id', id);
+    await load();
   };
 
   const toggle = async (cat: Category) => {
@@ -58,6 +62,10 @@ export default function CategoriesAdminPage() {
 
   return (
     <div className="max-w-xl space-y-4">
+      <h1 className="text-xl font-bold">Categorias</h1>
+      <p className="text-xs text-neutral-400 -mt-2">
+        Use as setas para definir a ordem em que aparecem no cardápio. Clique no nome para renomear.
+      </p>
       <div className="flex gap-2">
         <input
           className="input flex-1"
@@ -71,6 +79,9 @@ export default function CategoriesAdminPage() {
         </button>
       </div>
 
+      {loading ? (
+        <p className="text-neutral-400 py-8 text-center">Carregando...</p>
+      ) : (
       <div className="card divide-y divide-neutral-100">
         {categories.map((cat, i) => (
           <div key={cat.id} className="p-3 flex items-center gap-2">
@@ -98,6 +109,7 @@ export default function CategoriesAdminPage() {
         ))}
         {categories.length === 0 && <p className="p-4 text-sm text-neutral-500">Nenhuma categoria ainda.</p>}
       </div>
+      )}
     </div>
   );
 }

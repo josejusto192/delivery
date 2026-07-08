@@ -74,9 +74,9 @@ export default function ProductForm({
     [recipe, ingredientById]
   );
 
-  const effectiveMargin = marginOverride !== '' ? Number(marginOverride) : defaultMarginPercent;
-  const suggestedPrice =
-    effectiveMargin < 100 ? costPrice / (1 - effectiveMargin / 100) : costPrice;
+  const marginNumber = marginOverride !== '' ? Number(marginOverride) : defaultMarginPercent;
+  const effectiveMargin = Number.isFinite(marginNumber) ? Math.min(95, Math.max(0, marginNumber)) : defaultMarginPercent;
+  const suggestedPrice = costPrice / (1 - effectiveMargin / 100);
 
   const patchRecipeItem = (idx: number, patch: Partial<DraftRecipeItem>) =>
     setRecipe((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
@@ -243,48 +243,61 @@ export default function ProductForm({
           <div className="space-y-2">
             {recipe.map((r, ri) => {
               const ing = ingredientById.get(r.ingredientId);
-              const lineCost = ing ? (Number(r.quantity) || 0) * Number(ing.cost_per_unit) : 0;
+              const qty = Number(r.quantity) || 0;
+              const lineCost = ing ? qty * Number(ing.cost_per_unit) : 0;
+              const gramsHint =
+                ing?.unit === 'kg' && qty > 0
+                  ? `= ${qty >= 1 ? `${qty.toLocaleString('pt-BR')} kg` : `${Math.round(qty * 1000)} g`}`
+                  : '';
               return (
-                <div key={ri} className="flex items-center gap-2">
-                  <select
-                    className="input flex-1"
-                    value={r.ingredientId}
-                    onChange={(e) => patchRecipeItem(ri, { ingredientId: e.target.value })}
-                  >
-                    <option value="">Selecione o insumo</option>
-                    {ingredients.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="relative">
-                    <input
-                      className="input !w-28 !pr-9"
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      placeholder="Qtd."
-                      value={r.quantity}
-                      onChange={(e) => patchRecipeItem(ri, { quantity: e.target.value })}
-                    />
-                    {ing && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400">
-                        {ing.unit}
-                      </span>
-                    )}
+                <div key={ri}>
+                  <div className="flex items-center gap-2">
+                    <select
+                      className="input flex-1"
+                      value={r.ingredientId}
+                      onChange={(e) => patchRecipeItem(ri, { ingredientId: e.target.value })}
+                    >
+                      <option value="">Selecione o insumo</option>
+                      {ingredients.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.name} ({i.unit === 'kg' ? 'kg' : 'un'})
+                        </option>
+                      ))}
+                    </select>
+                    <div className="relative">
+                      <input
+                        className="input !w-28 !pr-9"
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        placeholder={ing?.unit === 'kg' ? '0,150' : 'Qtd.'}
+                        value={r.quantity}
+                        onChange={(e) => patchRecipeItem(ri, { quantity: e.target.value })}
+                      />
+                      {ing && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400">
+                          {ing.unit}
+                        </span>
+                      )}
+                    </div>
+                    <span className="w-20 shrink-0 text-right text-xs text-neutral-500">
+                      {ing ? brl(lineCost) : ''}
+                    </span>
+                    <button
+                      type="button"
+                      title="Remover insumo"
+                      className="h-9 w-9 grid place-items-center rounded-lg text-neutral-300 hover:text-red-500 shrink-0"
+                      onClick={() => setRecipe(recipe.filter((_, i) => i !== ri))}
+                    >
+                      ×
+                    </button>
                   </div>
-                  <span className="w-20 shrink-0 text-right text-xs text-neutral-500">
-                    {ing ? brl(lineCost) : ''}
-                  </span>
-                  <button
-                    type="button"
-                    title="Remover insumo"
-                    className="h-9 w-9 grid place-items-center rounded-lg text-neutral-300 hover:text-red-500 shrink-0"
-                    onClick={() => setRecipe(recipe.filter((_, i) => i !== ri))}
-                  >
-                    ×
-                  </button>
+                  {gramsHint && (
+                    <p className={`text-[11px] mt-0.5 ml-1 ${qty > 3 ? 'text-red-500 font-semibold' : 'text-neutral-400'}`}>
+                      {gramsHint}
+                      {qty > 3 && ' — quantidade alta! Lembre: a medida é em kg (150 g = 0,150)'}
+                    </p>
+                  )}
                 </div>
               );
             })}

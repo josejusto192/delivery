@@ -134,6 +134,15 @@ function SidebarContent({ pathname, onNavigate }: { pathname: string; onNavigate
   );
 }
 
+function currentLabel(pathname: string): string {
+  for (const item of ITEMS) {
+    if (item.href === pathname) return item.label;
+    const child = item.children?.find((c) => c.href === pathname);
+    if (child) return child.label;
+  }
+  return 'Painel da loja';
+}
+
 export default function AdminSidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -152,7 +161,7 @@ export default function AdminSidebar() {
             <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <h1 className="font-bold">Painel da loja</h1>
+        <p className="font-bold">{currentLabel(pathname)}</p>
       </div>
 
       {/* drawer mobile */}

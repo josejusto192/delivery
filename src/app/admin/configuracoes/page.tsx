@@ -148,6 +148,7 @@ export default function SettingsAdminPage() {
 
   return (
     <div className="max-w-5xl space-y-4">
+      <h1 className="text-xl font-bold">Configurações</h1>
       <div className="grid lg:grid-cols-2 gap-4 items-start">
       <div className="card p-4 space-y-3">
         <h3 className="font-semibold">Loja</h3>

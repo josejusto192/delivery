@@ -109,10 +109,11 @@ export default function LoyaltyAdminPage() {
     await load();
   };
 
-  if (!settings) return null;
+  if (!settings) return <p className="text-neutral-400 py-8 text-center">Carregando...</p>;
 
   return (
     <div className="max-w-2xl space-y-4">
+      <h1 className="text-xl font-bold">Programa de fidelidade</h1>
       <div className="card p-4 space-y-3">
         <h3 className="font-semibold">Configuração do programa de fidelidade</h3>
         <label className="flex items-center gap-2 text-sm">

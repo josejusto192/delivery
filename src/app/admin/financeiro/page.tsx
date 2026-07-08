@@ -25,7 +25,9 @@ export default function FinanceiroAdminPage() {
   const supabase = useMemo(() => createClient(), []);
   const [templates, setTemplates] = useState<ExpenseTemplate[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [revenue, setRevenue] = useState<number | null>(null);
   const [month, setMonth] = useState(currentMonth());
+  const [loading, setLoading] = useState(true);
   const [templateDraft, setTemplateDraft] = useState<TemplateDraft>(emptyTemplateDraft);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft>(emptyExpenseDraft);
@@ -38,12 +40,26 @@ export default function FinanceiroAdminPage() {
   };
 
   const loadExpenses = async (m: string) => {
-    const { data } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('competence_month', `${m}-01`)
-      .order('due_date', { ascending: true, nullsFirst: false });
+    const [y, mo] = m.split('-').map(Number);
+    const monthStart = new Date(y, mo - 1, 1);
+    const monthEnd = new Date(y, mo, 1);
+    const [{ data }, { data: orders }] = await Promise.all([
+      supabase
+        .from('expenses')
+        .select('*')
+        .eq('competence_month', `${m}-01`)
+        .order('due_date', { ascending: true, nullsFirst: false }),
+      supabase
+        .from('orders')
+        .select('total, status')
+        .gte('created_at', monthStart.toISOString())
+        .lt('created_at', monthEnd.toISOString())
+        .neq('status', 'canceled')
+        .limit(10000),
+    ]);
     setExpenses(data ?? []);
+    setRevenue((orders ?? []).reduce((s, o) => s + Number(o.total), 0));
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -161,9 +177,53 @@ export default function FinanceiroAdminPage() {
   const totalMonth = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const totalPaid = expenses.filter((e) => e.paid).reduce((s, e) => s + Number(e.amount), 0);
   const totalPending = totalMonth - totalPaid;
+  const result = (revenue ?? 0) - totalMonth;
+
+  if (loading) {
+    return (
+      <div className="max-w-3xl space-y-4">
+        <h1 className="text-xl font-bold">Financeiro</h1>
+        <p className="text-neutral-400 py-8 text-center">Carregando...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-xl font-bold mr-auto">Financeiro</h1>
+        <input
+          type="month"
+          className="input !w-auto !py-1.5"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+        />
+      </div>
+
+      <div className="card p-4">
+        <h3 className="font-semibold capitalize mb-3">Resultado de {monthLabel(month)}</h3>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="bg-neutral-50 rounded-lg p-3">
+            <p className="text-xs text-neutral-500">Faturamento (pedidos)</p>
+            <p className="font-bold text-lg mt-0.5">{brl(revenue ?? 0)}</p>
+          </div>
+          <div className="bg-neutral-50 rounded-lg p-3">
+            <p className="text-xs text-neutral-500">Despesas</p>
+            <p className="font-bold text-lg mt-0.5">− {brl(totalMonth)}</p>
+          </div>
+          <div className={`rounded-lg p-3 ${result >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+            <p className={`text-xs ${result >= 0 ? 'text-green-700' : 'text-red-600'}`}>Resultado</p>
+            <p className={`font-bold text-lg mt-0.5 ${result >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+              {brl(result)}
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-neutral-400 mt-2">
+          O faturamento considera todos os pedidos não cancelados do mês. As despesas incluem contas pagas e pendentes.
+          O custo dos insumos não entra aqui — ele já está embutido no preço de cada produto.
+        </p>
+      </div>
+
       <div className="card p-4 space-y-3">
         <div>
           <h3 className="font-semibold">Custos fixos (recorrentes)</h3>
@@ -256,24 +316,14 @@ export default function FinanceiroAdminPage() {
       <div className="card p-4 space-y-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <h3 className="font-semibold capitalize">Contas — {monthLabel(month)}</h3>
-          <div className="flex items-center gap-2">
-            <input
-              type="month"
-              className="input !w-auto !py-1.5"
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-            />
+          {templates.some((t) => t.active) && (
             <button className="btn-brand !py-1.5 !px-3 text-sm" onClick={generateMonthly} disabled={generating}>
               {generating ? 'Gerando...' : 'Gerar contas fixas do mês'}
             </button>
-          </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="bg-neutral-50 rounded-lg p-2.5">
-            <p className="text-xs text-neutral-500">Total do mês</p>
-            <p className="font-bold">{brl(totalMonth)}</p>
-          </div>
+        <div className="grid grid-cols-2 gap-2 text-center">
           <div className="bg-green-50 rounded-lg p-2.5">
             <p className="text-xs text-green-700">Pago</p>
             <p className="font-bold text-green-700">{brl(totalPaid)}</p>
