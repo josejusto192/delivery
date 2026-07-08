@@ -99,6 +99,30 @@ export type Coupon = {
   expires_at: string | null;
 };
 
+export type ExpenseTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  amount: number;
+  day_of_month: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type Expense = {
+  id: string;
+  template_id: string | null;
+  name: string;
+  category: string;
+  amount: number;
+  competence_month: string;
+  due_date: string | null;
+  paid: boolean;
+  paid_at: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
 export type Promotion = {
   id: string;
   name: string;
