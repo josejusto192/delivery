@@ -208,6 +208,7 @@ export type Order = {
   notes: string | null;
   issue_type: string | null;
   issue_notes: string | null;
+  stock_deducted: boolean;
   created_at: string;
   updated_at: string;
   order_items?: OrderItem[];
